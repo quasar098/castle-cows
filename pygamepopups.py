@@ -181,12 +181,12 @@ class PauseMenu:
         self.height = 500
         self.shown = False
         self.pause_font = pygame.font.SysFont("Helvetica", 25)
-        self.pause_menu_text = Text(_move_pos(self.get_rect().midtop, (0, 5)), self.pause_font, "Pause menu", "midtop")
-        self.hover_opacity_text = Text(_move_pos(self.get_rect().topleft, (45, 50)), self.pause_font, "Card Hover Visibility",
-                                       "topleft", wrap_rect=True)
-        self.hover_opacity = MultipleChoice(_move_pos(self.hover_opacity_text.rect.topright, (7, -10)), self.pause_font,
-                                            ["Opaque", "Translucent", "Invisible"])
-        self.hover_opacity.selected_option = "Translucent"
+        mid_top = pygame.Rect(self.get_rect().left+10, self.get_rect().top+40, self.get_rect().width-20, 30)
+        self.pause_menu_text = Text(self.get_rect().midtop, self.pause_font, "Pause menu", "midtop")
+        o1 = mid_top
+        self.hover_opacity_text = Text(o1, self.pause_font, "Card Hover Visibility", "topleft", wrap_rect=True)
+        self.hover_opacity = MultipleChoice(o1.move(0, 40), self.pause_font, ["Opaque", "Translucent", "Invisible"])
+        self.hover_opacity.selected_option = "Translucent"  # default option is translucent
         self.connection_interval_text = Text(_move_pos(self.get_rect().topleft, (45, 160)), self.pause_font, "Connection speed: ",
                                              "topleft", wrap_rect=True)
         self.connection_interval = MultipleChoice(_move_pos(self.connection_interval_text.rect.topright, (7, -10)), self.pause_font,

@@ -1,5 +1,6 @@
 # Castle Cows
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
+[![lines of code](https://img.shields.io/tokei/lines/github/quasar098/castle-cows)](https://quasar098.github.io)
 
 ## How to play:
 Rulebook still unavailible. Will be put in game when the game is ready.

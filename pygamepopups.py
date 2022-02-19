@@ -193,9 +193,15 @@ class PauseMenu:
         self.hover_opacity = MultipleChoice(setting, self.pause_font, ["Opaque", "Translucent", "Invisible"])
         self.hover_opacity.selected_option = "Translucent"  # default option is translucent
 
+        # connection interval
         self.connection_interval_text = Text(word.move(0, 50), self.pause_font, "Connection speed: ", "midleft", wrap_rect=True)
         self.connection_interval = MultipleChoice(setting.move(0, 50), self.pause_font, ["20 per second", "10 per second", "5 per second"])
         self.connection_interval.selected_option = "20 per second"
+
+        # land scraping accuracy
+        self.land_scrape_accuracy_text = Text(word.move(0, 100), self.pause_font, "Land overlaping accuracy: ", "midleft", wrap_rect=True)
+        self.land_scrape_accuracy = MultipleChoice(setting.move(0, 100), self.pause_font, [2, 3, 10])
+        self.land_scrape_accuracy.selected_option = 3
 
         # set pause menu to self
         global pause_menu
@@ -210,8 +216,13 @@ class PauseMenu:
             self.hover_opacity.draw(surface)
             self.connection_interval_text.draw(surface)
             self.connection_interval.draw(surface)
+            self.land_scrape_accuracy_text.draw(surface)
+            self.land_scrape_accuracy.draw(surface)
+
+            # draw dropdown
             self.hover_opacity.draw_select(surface)
             self.connection_interval.draw_select(surface)
+            self.land_scrape_accuracy.draw_select(surface)
 
     def get_rect(self) -> pygame.Rect:
         return pygame.Rect(self.center[0]-self.width/2, self.center[1]-self.height/2, self.width, self.height)
@@ -223,6 +234,7 @@ class PauseMenu:
                 self.shown = not self.shown
                 self.connection_interval.selecting_option = False
                 self.hover_opacity.selecting_option = False
+                self.land_scrape_accuracy.selecting_option = False
                 return True
         if self.shown:
             if event.type == pygame.MOUSEBUTTONDOWN:
@@ -232,6 +244,8 @@ class PauseMenu:
                         if self.hover_opacity.handle_events(event):
                             return True
                         if self.connection_interval.handle_events(event):
+                            return True
+                        if self.land_scrape_accuracy.handle_events(event):
                             return True
 
                         return True

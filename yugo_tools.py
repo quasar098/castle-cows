@@ -246,7 +246,7 @@ class Switch(Text):
 
 class MultipleChoice:
     def __init__(self, rect: Union[pygame.Rect, tuple[int, int, int, int], tuple[float, float]],
-                 font: pygame.font.Font, options: list[str],
+                 font: pygame.font.Font, options: list[Any],
                  color: Union[tuple[int, int, int], pygame.Color] = (255, 255, 255)):
         """An element made so the user can choose between multiple items
         Basically a drop down menu

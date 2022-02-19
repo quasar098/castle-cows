@@ -140,8 +140,9 @@ class Field:
                 else:
                     self.land_bloom_out_anim[id(card)] -= 0.05*75/framerate
                 self.land_bloom_out_anim[id(card)] = clamp(self.land_bloom_out_anim[id(card)], 0, 1)
-                pygame.draw.circle(surface, pygame.color.Color(169, 228, 239).lerp((255, 147, 61), 0.3),
-                                   _move_pos(card.mod_pos(), (125, 162)), 500+cserp(self.land_bloom_out_anim[id(card)])*100)
+                anim = cserp(self.land_bloom_out_anim[id(card)])
+                pygame.draw.circle(surface, pygame.color.Color(169, 228, 239).lerp((255, 147, 61), 0.3+anim*0.4),
+                                   _move_pos(card.mod_pos(), (125, 162)), 500)
         for card in self.cards:
             card.draw(surface)
 
@@ -283,6 +284,11 @@ class Player:
             discard_top_card_surf = get_image(join("images", "cards", self.discard_pile[len(self.discard_pile)-1].image), (0.3, 0.3))
             surface.blit(discard_top_card_surf, discard_top_card_surf.get_rect(topleft=discard_rect.topleft))
             surface.blit(fetch_text(f"Discard Pile", font), discard_rect.move(0, -25).topleft)
+
+        # set the scraping land amount
+        new_coll = get_pause_menu().land_scrape_accuracy.selected_option
+        if land_collision_accuracy != new_coll:
+            set_land_coll_acc(new_coll)
 
         # hover cards in fake cards
         hand_card_image_name = None
@@ -661,6 +667,13 @@ stat_man = StatisticsManager()
 
 # other
 card_LOD = 60  # card distance apart (lift off distance) when equipments are equipped
+land_collision_accuracy = 3  # how accurate to be with collision when scraping (scrape) the edge of lands against other lands
+
+
+def set_land_coll_acc(val):
+    global land_collision_accuracy
+    land_collision_accuracy = val
+
 
 # special effects
 currency_particles: list[CurrencyParticle] = []
@@ -949,14 +962,32 @@ class Card:
             self.selected = False
         if event.type == pygame.MOUSEMOTION:
             if self.selected:
-                if self.type == LAND_TYPE:
+                if self.type != LAND_TYPE or rel == (0, 0):
+                    self.y += rel[1]
+                    self.x += rel[0]
+                else:
                     other_lands = [card for card in get_local_player().field.cards if card.type == LAND_TYPE]
                     other_lands.remove(self)
-                    centers = [(land.x+125, land.y+162.5) for land in other_lands]
+                    centers = [(land.x+125, land.y+162) for land in other_lands]
+                    def pyth_theorem(pos1, pos2): return sqrt((pos1[0]-pos2[0])**2+(pos1[1]-pos2[1])**2)
+                    for _ in range(land_collision_accuracy):
+                        self.x += rel[0]/land_collision_accuracy
+                        for center in centers:
+                            self_center = (self.x+125, self.y+162)
+                            while pyth_theorem(center, self_center) < 1000:
+                                self.x -= rel[0]/10
+                                self_center = (self.x+125, self.y+162)
+                                if pyth_theorem(center, self_center) > 1000:
+                                    break
+                        self.y += rel[1]/land_collision_accuracy
+                        for center in centers:
+                            self_center = (self.x+125, self.y+162)
+                            while pyth_theorem(center, self_center) < 1000:
+                                self.y -= rel[1]/10
+                                self_center = (self.x+125, self.y+162)
+                                if pyth_theorem(center, self_center) > 1000:
+                                    break
 
-                    return False
-                self.x += rel[0]
-                self.y += rel[1]
         return False
 
     def __str__(self):

@@ -181,17 +181,23 @@ class PauseMenu:
         self.height = 500
         self.shown = False
         self.pause_font = pygame.font.SysFont("Helvetica", 25)
-        mid_top = pygame.Rect(self.get_rect().left+10, self.get_rect().top+40, self.get_rect().width-20, 30)
+
+        # actual stuff
+        segment = pygame.Rect(self.get_rect().left+10, self.get_rect().top+40, self.get_rect().width-20, 40)
+        word = pygame.Rect(segment.x, segment.y, segment.w/2, segment.h)
+        setting = pygame.Rect(segment.x+segment.w/2, segment.y, segment.w/2, segment.h)
         self.pause_menu_text = Text(self.get_rect().midtop, self.pause_font, "Pause menu", "midtop")
-        o1 = mid_top
-        self.hover_opacity_text = Text(o1, self.pause_font, "Card Hover Visibility", "topleft", wrap_rect=True)
-        self.hover_opacity = MultipleChoice(o1.move(0, 40), self.pause_font, ["Opaque", "Translucent", "Invisible"])
+
+        # hover card opacity
+        self.hover_opacity_text = Text(word, self.pause_font, "Card Hover Visibility", "midleft", wrap_rect=True)
+        self.hover_opacity = MultipleChoice(setting, self.pause_font, ["Opaque", "Translucent", "Invisible"])
         self.hover_opacity.selected_option = "Translucent"  # default option is translucent
-        self.connection_interval_text = Text(_move_pos(self.get_rect().topleft, (45, 160)), self.pause_font, "Connection speed: ",
-                                             "topleft", wrap_rect=True)
-        self.connection_interval = MultipleChoice(_move_pos(self.connection_interval_text.rect.topright, (7, -10)), self.pause_font,
-                                                  ["20 per second", "10 per second", "5 per second"])
+
+        self.connection_interval_text = Text(word.move(0, 50), self.pause_font, "Connection speed: ", "midleft", wrap_rect=True)
+        self.connection_interval = MultipleChoice(setting.move(0, 50), self.pause_font, ["20 per second", "10 per second", "5 per second"])
         self.connection_interval.selected_option = "20 per second"
+
+        # set pause menu to self
         global pause_menu
         pause_menu = self
 
@@ -204,6 +210,8 @@ class PauseMenu:
             self.hover_opacity.draw(surface)
             self.connection_interval_text.draw(surface)
             self.connection_interval.draw(surface)
+            self.hover_opacity.draw_select(surface)
+            self.connection_interval.draw_select(surface)
 
     def get_rect(self) -> pygame.Rect:
         return pygame.Rect(self.center[0]-self.width/2, self.center[1]-self.height/2, self.width, self.height)
@@ -221,8 +229,10 @@ class PauseMenu:
                 if event.button == 1:
                     if self.get_rect().collidepoint(pygame.mouse.get_pos()):  # clicked inside the pause menu rectangle
 
-                        self.hover_opacity.handle_events(event)
-                        self.connection_interval.handle_events(event)
+                        if self.hover_opacity.handle_events(event):
+                            return True
+                        if self.connection_interval.handle_events(event):
+                            return True
 
                         return True
                     else:

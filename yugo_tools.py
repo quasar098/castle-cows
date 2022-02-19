@@ -308,6 +308,8 @@ class MultipleChoice:
         arrow_head = _move_pos(self.rect.midright, (-self.rect.h/2, 5))
         pygame.draw.line(surface, secondary_color, arrow_head, _move_pos(arrow_head, (-10, -10)), 4)
         pygame.draw.line(surface, secondary_color, arrow_head, _move_pos(arrow_head, (10, -10)), 4)
+
+    def draw_select(self, surface: pygame.Surface) -> None:
         if self.selecting_option:
             options_rect = pygame.Rect(self.rect.x, self.rect.y,
                                        self.rect.w, (self.font.get_height()+4)*len(self.options)+8)
@@ -320,7 +322,7 @@ class MultipleChoice:
                     pygame.draw.rect(surface, pygame.Color(149, 150, 157).lerp(self.color, 0.7), option_rect)
                 surface.blit(self.options[option], option_rect.topleft)
 
-    def handle_events(self, event: pygame.event.Event) -> None:
+    def handle_events(self, event: pygame.event.Event) -> bool:
         if event.type == pygame.MOUSEBUTTONDOWN:
             if event.button == 1:  # lmb pressed down
                 if not self.selecting_option:
@@ -333,8 +335,10 @@ class MultipleChoice:
                         if option_rect.collidepoint(pygame.mouse.get_pos()):
                             self.selected_option = option
                     self.selecting_option = False
+                    return True
         if event.type == pygame.WINDOWLEAVE:
             self.selecting_option = False
+        return False
 
 
 class InputBox:

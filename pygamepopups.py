@@ -153,16 +153,17 @@ class RightClickMenu:  # there should only be one of these
         if self.shown:
             pygame.draw.rect(surface, (0, 0, 0), self.get_rect().inflate(2, 2))
             pygame.draw.rect(surface, (255, 255, 255), self.get_rect())
+            width = rcm_width
             for count, option in enumerate(self.options):
                 if isinstance(option, RightClickAbility):
                     if not option.can_pay_for_it:
-                        pygame.draw.rect(surface, (249, 57, 67), (self.x, self.y+count*self.font.get_height(), 200, self.font.get_height()))
-                if pygame.Rect((self.x, self.y+count*self.font.get_height(), 200, self.font.get_height()))\
+                        pygame.draw.rect(surface, (249, 57, 67), (self.x, self.y+count*self.font.get_height(), width, self.font.get_height()))
+                if pygame.Rect((self.x, self.y+count*self.font.get_height(), width, self.font.get_height()))\
                         .collidepoint(pygame.mouse.get_pos()):
-                    pygame.draw.rect(surface, (189, 189, 189), (self.x, self.y+count*self.font.get_height(), 200, self.font.get_height()))
+                    pygame.draw.rect(surface, (189, 189, 189), (self.x, self.y+count*self.font.get_height(), width, self.font.get_height()))
                     if isinstance(option, RightClickAbility):
                         if not option.can_pay_for_it:
-                            pygame.draw.rect(surface, (148, 39, 45), (self.x, self.y+count*self.font.get_height(), 200, self.font.get_height()))
+                            pygame.draw.rect(surface, (148, 39, 45), (self.x, self.y+count*self.font.get_height(), width, self.font.get_height()))
                 surface.blit(self.fetch_text(option.text), (self.x, self.y+count*self.font.get_height()))
 
 
@@ -172,6 +173,14 @@ pause_menu = None
 
 def get_pause_menu():
     return pause_menu
+
+
+def set_rcm_width(val: int):
+    global rcm_width
+    rcm_width = val
+
+
+rcm_width = 300
 
 
 class PauseMenu:
@@ -203,6 +212,11 @@ class PauseMenu:
         self.land_scrape_accuracy = MultipleChoice(setting.move(0, 100), self.pause_font, [2, 3, 10])
         self.land_scrape_accuracy.selected_option = 3
 
+        # rcm width
+        self.rcm_width_text = Text(word.move(0, 150), self.pause_font, "RMB menu width: ", "midleft", wrap_rect=True)
+        self.rcm_width = MultipleChoice(setting.move(0, 150), self.pause_font, [300, 350, 450])
+        self.rcm_width.selected_option = 300
+
         # set pause menu to self
         global pause_menu
         pause_menu = self
@@ -218,11 +232,14 @@ class PauseMenu:
             self.connection_interval.draw(surface)
             self.land_scrape_accuracy_text.draw(surface)
             self.land_scrape_accuracy.draw(surface)
+            self.rcm_width_text.draw(surface)
+            self.rcm_width.draw(surface)
 
             # draw dropdown
             self.hover_opacity.draw_select(surface)
             self.connection_interval.draw_select(surface)
             self.land_scrape_accuracy.draw_select(surface)
+            self.rcm_width.draw(surface)
 
     def get_rect(self) -> pygame.Rect:
         return pygame.Rect(self.center[0]-self.width/2, self.center[1]-self.height/2, self.width, self.height)
@@ -246,6 +263,8 @@ class PauseMenu:
                         if self.connection_interval.handle_events(event):
                             return True
                         if self.land_scrape_accuracy.handle_events(event):
+                            return True
+                        if self.rcm_width.handle_events(event):
                             return True
 
                         return True

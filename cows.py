@@ -5,7 +5,7 @@ from numpy import clip as clamp, log2
 from math import sqrt
 # noinspection PyUnresolvedReferences
 from pygamepopups import update_popups, handle_popup_events, RightClickMenu, RightClickOption, \
-    RightClickAbility, get_pause_menu
+    RightClickAbility, get_pause_menu, set_rcm_width
 from effects import CurrencyParticle, CircleParticle, play_sound_path, FakeCard
 from constants import *
 # noinspection PyUnresolvedReferences
@@ -77,7 +77,7 @@ class Hand:
             in_anim_sum = sum([cserp(self.in_anim.get(id(in_card), 0)) for in_card in self.cards])
             log_part = 1
             if not in_anim_sum == 0:
-                log_part = log2(in_anim_sum+1)
+                log_part = clamp(log2(in_anim_sum+1), 1, 18923)
             if log_part == 0:
                 log_part = 1
             x = surface.get_width()/2  # start at center
@@ -241,7 +241,6 @@ class Player:
         money_rectangle = pygame.Rect(player_info_rect.left, player_info_rect.top, box_width, box_height)
         pygame.draw.rect(surface, (0, 0, 0), expand_rect(money_rectangle, 4), border_radius=border_rounding)
         money_surf = pygame.Surface(money_rectangle.size)
-        money_surf.set_alpha(127)
         money_surf.fill((94, 252, 141))
         surface.blit(money_surf, money_rectangle.topleft)
 
@@ -255,7 +254,6 @@ class Player:
         milk_rectangle = pygame.Rect(player_info_rect.left+40+spacing_x, player_info_rect.top, box_width, box_height)
         pygame.draw.rect(surface, (0, 0, 0), expand_rect(milk_rectangle, 4), border_radius=border_rounding)
         milk_surf = pygame.Surface(milk_rectangle.size)
-        milk_surf.set_alpha(127)
         milk_surf.fill((163, 247, 255))
         surface.blit(milk_surf, milk_rectangle.topleft)
 
@@ -268,7 +266,6 @@ class Player:
         hay_rectangle = pygame.Rect(player_info_rect.left+(40+spacing_x)*2, player_info_rect.top, box_width, box_height)
         pygame.draw.rect(surface, (0, 0, 0), expand_rect(hay_rectangle, 4), border_radius=border_rounding)
         hay_surf = pygame.Surface(hay_rectangle.size)
-        hay_surf.set_alpha(127)
         hay_surf.fill((245, 230, 99))
         surface.blit(hay_surf, hay_rectangle.topleft)
 
@@ -289,6 +286,9 @@ class Player:
         new_coll = get_pause_menu().land_scrape_accuracy.selected_option
         if land_collision_accuracy != new_coll:
             set_land_coll_acc(new_coll)
+
+        # set the rcm width
+        set_rcm_width(get_pause_menu().rcm_width.selected_option)
 
         # hover cards in fake cards
         hand_card_image_name = None
@@ -354,10 +354,20 @@ class Player:
 
                 return newthing
 
-            # draw inhabitants (e.g. "+ Greenest Grass")
+            # add animal inhabitants
+            on_land: list[int] = []
+            if card_hover in self.field.cards:
+                for card_inhab in card_hover.get_residents():
+                    inhabitants.append(card_inhab)
+                    on_land.append(id(card_inhab))
+
+            # do inhabitants and equipments (naming is scuffed)
             if len(inhabitants) > 0:
                 for inhab_count, card_inhab in enumerate(inhabitants):
-                    card_type_text = fetch_text(f"+ {class_to_string(card_inhab)}", font)
+                    if id(card_inhab) in on_land:
+                        card_type_text = fetch_text(f"{class_to_string(card_inhab)} lives here", font)
+                    else:
+                        card_type_text = fetch_text(f"+ {class_to_string(card_inhab)}", font)
                     surface.blit(card_type_text,
                                  card_type_text.get_rect(
                                      midtop=_move_pos(hover_rect.midbottom, (0, 30*inhab_count+10))))
@@ -461,6 +471,7 @@ class Player:
                             if not remove_currency_if_has(card_field.cost_currency, card_field.cost_amount):
                                 self.field.cards.remove(card_field)
                                 self.hand.cards.insert(self.index_of_grab, card_field)
+                                add_popup("You don't have enough money")
                                 return True
                             card_field.was_on_field = True
                             play_sound_path(join("sounds", "cardfold.mp3"), 0.4)
@@ -539,9 +550,17 @@ class Player:
         for card in self.field.cards:
             if card.type in (INCANTATION_TYPE, EQUIPMENT_TYPE):
                 add_popup("This needs to go on a card"*(card.type == EQUIPMENT_TYPE) +
-                          "How did this happen?????"*(card.type == INCANTATION_TYPE))
+                          "How tf you do that?????"*(card.type == INCANTATION_TYPE))
                 camera_to_card(card)
                 return True
+
+        # overcrowding on lands:
+        for card in [_ for _ in self.field.cards if _.type == LAND_TYPE and _.was_on_field]:
+            if card.max_capacity is not None:
+                if len(card.get_residents()) > card.max_capacity:
+                    camera_to_card(card)
+                    add_popup("Too many animals on this land!")
+                    return True
 
         # animals without a home
         not_homeless_cards = []
@@ -864,6 +883,10 @@ class Card:
         # other
         self.is_cow = False
 
+        # inhabitant shenanies
+        self.max_capacity = None
+        self.multipliers = {}  # (ex: {Card: 2, Pig: 3} means that all cards are buffed x2 total, pigs are buffed x6 total)
+
     def mod_x(self):
         return self.x-get_local_player().camera.x
 
@@ -920,13 +943,14 @@ class Card:
             card = self
         residents = []
         if card.type != LAND_TYPE:
-            return residents
+            return []
         if not player.field.cards.__contains__(card):
-            raise TypeError(f"Object of type {card.type} cannot have residents")
+            raise TypeError(f"Card not found")
         for card_try in player.field.cards:
             social_distance = distance((card.x+150, card.y+162), (card_try.x+150, card_try.y+162))
             if social_distance < 500:
-                residents.append(card_try)
+                if card_try.type == ANIMAL_TYPE:
+                    residents.append(card_try)
         if residents.__contains__(card):
             residents.remove(card)
         return residents
@@ -949,6 +973,7 @@ class Card:
         rect_of_self.h += card_LOD*len(self.equipped)
         if rect_h is not None:
             rect_of_self.h = rect_h
+
         if event.type == pygame.MOUSEBUTTONDOWN:
             if event.button == 1:
                 if rect_of_self.collidepoint(pygame.mouse.get_pos()):
@@ -962,32 +987,8 @@ class Card:
             self.selected = False
         if event.type == pygame.MOUSEMOTION:
             if self.selected:
-                if self.type != LAND_TYPE or rel == (0, 0):
-                    self.y += rel[1]
-                    self.x += rel[0]
-                else:
-                    other_lands = [card for card in get_local_player().field.cards if card.type == LAND_TYPE]
-                    other_lands.remove(self)
-                    centers = [(land.x+125, land.y+162) for land in other_lands]
-                    def pyth_theorem(pos1, pos2): return sqrt((pos1[0]-pos2[0])**2+(pos1[1]-pos2[1])**2)
-                    for _ in range(land_collision_accuracy):
-                        self.x += rel[0]/land_collision_accuracy
-                        for center in centers:
-                            self_center = (self.x+125, self.y+162)
-                            while pyth_theorem(center, self_center) < 1000:
-                                self.x -= rel[0]/10
-                                self_center = (self.x+125, self.y+162)
-                                if pyth_theorem(center, self_center) > 1000:
-                                    break
-                        self.y += rel[1]/land_collision_accuracy
-                        for center in centers:
-                            self_center = (self.x+125, self.y+162)
-                            while pyth_theorem(center, self_center) < 1000:
-                                self.y -= rel[1]/10
-                                self_center = (self.x+125, self.y+162)
-                                if pyth_theorem(center, self_center) > 1000:
-                                    break
-
+                self.x += rel[0]
+                self.y += rel[1]
         return False
 
     def __str__(self):
@@ -1000,6 +1001,7 @@ class Castle(Card):
     def __init__(self, pos: Union[list[int], tuple[int, int]] = (100, 100)):
         super().__init__(pos)
         self.type = LAND_TYPE
+        self.max_capacity = 3
         # cost is free
 
     def handle_action(self, action: int) -> Union[list[Action, DelayedAction, InputAction], None]:
@@ -1020,7 +1022,7 @@ class Arson(Card):
 
 
 class GreenestGrass(Card):
-    image = "greenestgrass.png"
+    image = "greenest_grass.png"
 
     def __init__(self, pos: Union[list[int], tuple[int, int]] = (100, 100)):
         super().__init__(pos)
@@ -1033,20 +1035,20 @@ class GreenestGrass(Card):
 
 
 class KingCow(Card):
-    image = "kingcow.png"
+    image = "king_cow.png"
 
     def __init__(self, pos: Union[list[int], tuple[int, int]] = (100, 100)):
         super().__init__(pos)
         self.type = ANIMAL_TYPE
         self.is_cow = True
         # notice how the cost is free
-        self.abilities = [Ability(Action(self, SELF_GIVE_MONEY, SELF_COWS_ON_FIELD), 1, HAY_COUNTER, "Tax the poor"),
-                          Ability(DelayedAction(self, SELF_GIVE_HAY, 1, SELF_TURN_START), 2, HAY_COUNTER,
-                                  "Bribe the king")]
+        self.abilities = [Ability(Action(self, SELF_GIVE_DAIRY, SELF_COWS_ON_FIELD), 1, HAY_COUNTER, "Milk the poor"),
+                          Ability(DelayedAction(self, SELF_GIVE_HAY, 2, SELF_TURN_START), 2, HAY_COUNTER,
+                                  "Invest in the king")]
 
 
 class BlackBrie(Card):
-    image = "blackbrie.png"
+    image = "black_brie.png"
 
     def __init__(self, pos: Union[list[int], tuple[int, int]] = (100, 100)):
         super().__init__(pos)

@@ -1,7 +1,7 @@
 import pygame
 from numpy import clip as clamp, cos, pi
 # noinspection PyUnresolvedReferences
-from yugo_tools import expand_rect, Text, Switch, MultipleChoice, _move_pos
+from yugo_tools import expand_rect, Text, Switch, MultipleChoice, _move_pos, Union
 
 text_storage: dict[str, pygame.Surface] = {}
 sub_text_storage: dict[str, pygame.Surface] = {}
@@ -128,7 +128,7 @@ class RightClickMenu:  # there should only be one of these
         return self.text_cache[text]
 
     def get_rect(self):
-        return pygame.Rect(self.x, self.y, 200,
+        return pygame.Rect(self.x, self.y, rcm_width,
                            self.font.get_height()*len(self.options))  # could 100% be optimized to not use list comp
         # every time this is called
 

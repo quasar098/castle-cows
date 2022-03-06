@@ -477,6 +477,9 @@ class Player:
                             play_sound_path(join("sounds", "cardfold.mp3"), 0.4)
                         if card_field.type == INCANTATION_TYPE:
                             for ability in card_field.abilities:
+                                if isinstance(ability, list):
+                                    for ab2 in ability:
+                                        ab2.activate()
                                 ability.activate()
                             get_local_player().clear_queue()
                             self.field.discard_card(card_field)
@@ -828,6 +831,9 @@ def execute_action(action: Union[Action, DelayedAction, InputAction]) -> None:
             if action.action == SELF_GIVE_HAY:
                 get_local_player().hay += 1
                 currency_particles.append(CurrencyParticle(particle_pos, HAY_COUNTER))
+            if action.action == STEAL_MONEY_FROM_ALL_OPPONENTS:
+                get_local_player().money += get_statistics_manager().get_num_players()*action.amount
+                # todo: remove money from other players
 
     elif isinstance(action, DelayedAction):
         # add delayed action to queue
@@ -869,7 +875,7 @@ class Card:
         self.y = pos[1]
         self.type = None  # category/type of card
         self.selected = False
-        self.abilities: set[Ability] = set()
+        self.abilities: list[Union[Ability, list[Ability]]] = []  # can be [Ability()] or [Ability(), [Ability(), Ability()]] etc
         self.was_on_field = False
 
         # cost stuff
@@ -896,9 +902,14 @@ class Card:
     def mod_pos(self):
         return self.mod_x(), self.mod_y()
 
-    def reset_abilities(self):
-        for ability in self.abilities:
-            ability.activated = False
+    def reset_abilities(self, ablist: Union[None, list[Ability]] = None):
+        if ablist is None:
+            ablist = self.abilities
+        for ability in ablist:
+            if isinstance(ability, list):
+                self.reset_abilities(ability)
+            else:
+                ability.activated = False
 
     def draw(self, surface: pygame.Surface):
         """Draw the card to the screen"""
@@ -1029,8 +1040,8 @@ class GreenestGrass(Card):
         self.type = EQUIPMENT_TYPE
         self.cost_amount = 3
         self.cost_currency = HAY_COUNTER
-        self.abilities = [Ability(Action(self, SELF_GIVE_MONEY, NUM_PLAYERS), 3, HAY_COUNTER, "+X money"),
-                          Ability(Action(self, SELF_GIVE_MONEY, 1), 1, MILK_COUNTER, "Milk to dollar")]
+        self.abilities = [Ability(Action(self, SELF_GIVE_MONEY, 1), 1, MILK_COUNTER, "Get 1"),
+                          [Ability(Action(self, STEAL_MONEY_FROM_ALL_OPPONENTS, 1), 1, HAY_COUNTER, "Take 1 from everyone")]]
         self.can_go_on = ANIMAL_TYPE
 
 

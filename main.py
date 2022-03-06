@@ -178,6 +178,10 @@ while running:
                 ability_rcm.activate()
                 get_local_player().clear_queue()
                 break
+            if isinstance(ability_rcm, list):
+                for ability in ability_rcm:
+                    ability.activate()
+                get_local_player().clear_queue()
             if event.type == pygame.MOUSEBUTTONDOWN:
                 if event.button == 3:
                     for card_rcm_hitbox in get_local_player().get_cards_recursively().__reversed__():
@@ -192,9 +196,16 @@ while running:
                                 card_right_click_list.append(RightClickOption(f"[debug] is cow?",
                                                                               lambda: add_debug_popup(f"{card_rcm_hitbox.is_cow}")))
                             for ability in card_rcm_hitbox.abilities:
-                                card_right_click_list.append(RightClickAbility(f"Ability: {ability.name}", ability,
-                                                                               get_local_player().can_pay_for(ability.currency, ability.cost)
-                                                                               * (1-ability.activated)))
+                                if isinstance(ability, list):
+                                    ab2 = ability[0]
+                                    card_right_click_list.append(RightClickAbility(f"Ability: {ab2.name}", ability,
+                                                                                   get_local_player().can_pay_for(ab2.currency, ab2.cost)
+                                                                                   * (1-ab2.activated)))
+
+                                else:
+                                    card_right_click_list.append(RightClickAbility(f"Ability: {ability.name}", ability,
+                                                                                   get_local_player().can_pay_for(ability.currency, ability.cost)
+                                                                                   * (1-ability.activated)))
                             right_click_menu.show(card_right_click_list)
                             break
 

@@ -176,7 +176,7 @@ deck_select_space = 600
 deck_create_button = Button((10, 10, WIDTH/2-deck_select_space/2-20, 90), font, action=make_new_deck, text="Make new deck")
 deck_delete_button = Button((10, 110, WIDTH / 2 - deck_select_space / 2 - 20, 90), font, action=delete_deck, text="Delete selected deck")
 deck_name_change = InputBox(pygame.Rect(WIDTH/2+deck_select_space/2+10, 10, WIDTH/2-deck_select_space/2-110, 40), small_font, text_if_no_text="deck name")
-deck_add_card_button = Button((10, HEIGHT-240, WIDTH/2-deck_select_space/2-20, 100), font, action=add_card_to_sel_deck, text="Add card to selected deck")
+deck_add_card_button = Button((10, HEIGHT-230, WIDTH/2-deck_select_space/2-20, 100), font, action=add_card_to_sel_deck, text="Add card to selected deck")
 deck_remove_card_button = Button((10, HEIGHT-120, WIDTH/2-deck_select_space/2-20, 100), font, action=remove_card_from_sel_deck, text="Remove card from selected deck")
 
 # deck selecter items list
@@ -424,6 +424,13 @@ while running:
         sel_add_option = list(deck_add_item_cards_list.keys())[deck_add_item_index]
         card_add_surf = fetch_text(f"Will add: {sel_add_option}", font)
         screen.blit(card_add_surf, card_add_surf.get_rect(center=deck_add_item_rect.center))
+
+        # deck add item hover card
+        hover_loc = deck_add_item_rect.midtop
+        hover_loc = hover_loc[0], hover_loc[1]-10  # this sucks!!!!!!!!! where is my _move_pos function at???
+        _ = deck_add_item_rect.midtop[1]-deck_delete_button.rect.midbottom[1]-20
+        hover_img = get_image(join("images", "cards", list(deck_add_item_cards_list.values())[deck_add_item_index].image), (0.5, 0.5))
+        screen.blit(hover_img, hover_img.get_rect(midbottom=hover_loc))
 
         # lines going up and down
         for _ in range(2):

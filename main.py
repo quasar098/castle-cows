@@ -136,7 +136,39 @@ def delete_deck():
 
 
 def add_card_to_sel_deck():
-    pass
+    # for simplicity
+    deck_add_list_items = [_ for _ in list(deck_add_item_cards_list.values())]
+
+    # add if not there already
+    if deck_add_list_items[deck_add_item_index] not in deck_builder.selected_deck.loot_pool:
+        deck_builder.selected_deck.loot_pool[deck_add_list_items[deck_add_item_index]] = 0
+
+    # change it
+    deck_builder.selected_deck.loot_pool[deck_add_list_items[deck_add_item_index]] += 1
+
+    # clamp
+    deck_builder.selected_deck.loot_pool[deck_add_list_items[deck_add_item_index]] = \
+        clamp(deck_builder.selected_deck.loot_pool[deck_add_list_items[deck_add_item_index]], 0, 4)
+
+
+def remove_card_from_sel_deck():
+    # for simplicity
+    deck_add_list_items = [_ for _ in list(deck_add_item_cards_list.values())]
+
+    # add if not there already
+    if deck_add_list_items[deck_add_item_index] not in deck_builder.selected_deck.loot_pool:
+        deck_builder.selected_deck.loot_pool[deck_add_list_items[deck_add_item_index]] = 0
+
+    # change it
+    deck_builder.selected_deck.loot_pool[deck_add_list_items[deck_add_item_index]] -= 1
+
+    # clamp
+    deck_builder.selected_deck.loot_pool[deck_add_list_items[deck_add_item_index]] = \
+        clamp(deck_builder.selected_deck.loot_pool[deck_add_list_items[deck_add_item_index]], 0, 4)
+
+    # remove if 0
+    if not deck_builder.selected_deck.loot_pool[deck_add_list_items[deck_add_item_index]]:
+        deck_builder.selected_deck.loot_pool.pop(deck_add_list_items[deck_add_item_index])
 
 
 # deck selecter ui
@@ -144,7 +176,15 @@ deck_select_space = 600
 deck_create_button = Button((10, 10, WIDTH/2-deck_select_space/2-20, 90), font, action=make_new_deck, text="Make new deck")
 deck_delete_button = Button((10, 110, WIDTH / 2 - deck_select_space / 2 - 20, 90), font, action=delete_deck, text="Delete selected deck")
 deck_name_change = InputBox(pygame.Rect(WIDTH/2+deck_select_space/2+10, 10, WIDTH/2-deck_select_space/2-110, 40), small_font, text_if_no_text="deck name")
-deck_add_card_button = Button((10, HEIGHT-120, WIDTH/2-deck_select_space/2-20, 100), font, action=add_card_to_sel_deck, text="Add card to selected deck")
+deck_add_card_button = Button((10, HEIGHT-240, WIDTH/2-deck_select_space/2-20, 100), font, action=add_card_to_sel_deck, text="Add card to selected deck")
+deck_remove_card_button = Button((10, HEIGHT-120, WIDTH/2-deck_select_space/2-20, 100), font, action=remove_card_from_sel_deck, text="Remove card from selected deck")
+
+# deck selecter items list
+deck_add_item_index = 0
+deck_add_item_cards_list = {card.get_name(card): card for card in Card.__subclasses__()}
+_ = pygame.Rect(0, 0, WIDTH/2-deck_select_space/2-20, 50)
+_.midbottom = deck_add_card_button.rect.midtop
+deck_add_item_rect = _.move(0, -10)
 
 # sounds
 coin_sound = pygame.mixer.Sound(join(getcwd(), "sounds", "coin.mp3"))
@@ -162,6 +202,15 @@ while running:
         if event.type == pygame.KEYDOWN:
             if event.key == pygame.K_F11:
                 toggle_debug()
+
+    # move mouse button events to the front
+    kl_list = []
+    for event_move in events:
+        if event_move.type == pygame.MOUSEBUTTONDOWN:
+            kl_list.append(event_move)
+    for hit_target in kl_list:
+        events.remove(hit_target)
+        events.insert(0, hit_target)
 
     # dont register events until blackscreen starts fading
     if 255-(5*(tick-FRAMERATE)*DELTATIME) > 0:
@@ -353,10 +402,28 @@ while running:
                     if escaped:
                         break
 
+            # handle adding items to the selected deck
+            if event.type == pygame.MOUSEWHEEL:
+                if deck_add_item_rect.collidepoint(pygame.mouse.get_pos()):
+                    deck_add_item_index = divmod(event.y+deck_add_item_index, len(deck_add_item_cards_list))[1]
+
+            # add and removing cards handling
+            deck_add_card_button.handle_events(event)
+            deck_remove_card_button.handle_events(event)
+
         # draw new deck button
         deck_create_button.draw(screen)
         deck_delete_button.draw(screen)
         deck_name_change.draw(screen)
+        deck_add_card_button.draw(screen)
+        deck_remove_card_button.draw(screen)
+
+        # deck add item chooser
+        pygame.draw.rect(screen, (0, 0, 0), deck_add_item_rect.inflate(4, 4), border_radius=3)
+        pygame.draw.rect(screen, (255, 255, 255), deck_add_item_rect, border_radius=3)
+        sel_add_option = list(deck_add_item_cards_list.keys())[deck_add_item_index]
+        card_add_surf = fetch_text(f"Will add: {sel_add_option}", font)
+        screen.blit(card_add_surf, card_add_surf.get_rect(center=deck_add_item_rect.center))
 
         # lines going up and down
         for _ in range(2):

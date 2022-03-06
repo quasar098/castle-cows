@@ -41,8 +41,9 @@ class DelayedAction:
 
 class ActionConditional:
     def __init__(self, card, requirement, comparison_type, amount):
-        """Its requirement | comparison type | amount,
-        so more than means that requirement > amount"""
+        """Its requirement comparison type amount (e.g. 2 > 3),
+        so more than means that requirement > amount
+        """
         self.card = card
         self.req = requirement
         self.comp = comparison_type
@@ -941,9 +942,10 @@ class Card:
         card_type.image: str
         name = card_type.image.replace("_", " ")  # remove underscores
         name = name.split(" ")
-        for word in name:
-            name = word[0].upper() + word[1:-4]
-        return "".join(name)
+        for count, word in enumerate(name):
+            name[count] = word[0].upper() + word[1:]
+        name[len(name)-1] = name[len(name)-1][:-4]
+        return " ".join(name)
 
     def get_residents(self, card=None, player: Player = None) -> list:
         """Uses the local player if no player is specified"""

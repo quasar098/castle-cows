@@ -53,9 +53,9 @@ class CurrencyParticle:
         self.angle = 0
         self.velo = 0
         self.speed = rand(120, 200)*0.01
-        if not (currency in (DAIRY_DOLLAR, MILK_COUNTER, HAY_COUNTER)):
+        if not (currency in (DOLLAR, MILK, HAY)):
             raise SyntaxError(f"wrong int, got {currency} instead")
-        self.currency = {DAIRY_DOLLAR: "money.png", MILK_COUNTER: "milk.png", HAY_COUNTER: "hay.png"}[currency]
+        self.currency = {DOLLAR: "money.png", MILK: "milk.png", HAY: "hay.png"}[currency]
         if self.currency == "milk.png":
             self.gx += 55
         if self.currency == "hay.png":

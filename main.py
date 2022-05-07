@@ -4,8 +4,14 @@ from pygamepopups import PauseMenu
 from packets import *
 from cows import *
 import pygame
-from win32api import EnumDisplayDevices, EnumDisplaySettings
 from deckbuilder import DeckBuilder
+
+# noinspection PyBroadException
+try:
+    from win32api import EnumDisplayDevices, EnumDisplaySettings
+    FRAMERATE = EnumDisplaySettings(EnumDisplayDevices().DeviceName, -1).DisplayFrequency
+except Exception:  # for whatever reason, if cannot find it or error with the module
+    FRAMERATE = 60
 
 pygame.init()
 
@@ -16,7 +22,6 @@ MAIN_COLOR = pygame.Color(129, 244, 149)
 
 # pygame variables
 WIDTH, HEIGHT = pygame.display.Info().current_w, pygame.display.Info().current_h
-FRAMERATE = EnumDisplaySettings(EnumDisplayDevices().DeviceName, -1).DisplayFrequency
 set_yugo_framerate(FRAMERATE)
 screen = pygame.display.set_mode([WIDTH, HEIGHT], pygame.FULLSCREEN | pygame.SCALED | pygame.HWACCEL, vsync=1)
 pygame.display.set_caption("Castle Cows Online")
@@ -50,12 +55,17 @@ def exit_cows():
     running = False
 
 
-def minimize_cows():
-    pygame.display.iconify()
+def minimize_cows(): pygame.display.iconify()
 
 
 def packet_thread():
     pass
+
+
+def back_to_home():
+    global viewing_screen
+    viewing_screen = MAIN_MENU_SCREEN
+    get_local_player().loot_pool = deck_builder.selected_deck.loot_pool
 
 
 # deck builder
@@ -73,31 +83,34 @@ def next_step():
     get_local_player().update_visible_currencies()
     step_texts = {"collect": "draw a card", "draw": "use your cards", "use": "end your turn"}  # what the button will say
     next_step_button.change(text=step_texts[get_local_player().step], color=(0, 0, 0))
-    if not get_local_player().is_my_turn:
-        next_step_button.change(text="not ur turn", color=(0, 0, 0))
-        get_statistics_manager().turns_passed += 1
     if get_local_player().step == "collect":  # new turn
         get_local_player().hay = 0
         get_local_player().visible_hay = 0
-        get_local_player().handle_card_actions(SELF_TURN_START)
+        get_local_player().handle_card_actions(GE_SELF_TURN_START)
         get_local_player().reset_abilities()
+        turn_count_text.change(font, f"{get_statistics_manager().turns_passed} turn{(get_statistics_manager().turns_passed>1)*'s'} passed")
     if get_local_player().step == "draw":
         play_sound(fold_sound, 0.5)
 
 
-# game ui
+# important ui
+back_button = Button((WIDTH-80, 50, 70, 30), font, action=back_to_home, text="<")
 exit_button = Button((WIDTH-40, 10, 30, 30), font, action=exit_cows, text="x")
 minimize_button = Button((WIDTH-80, 10, 30, 30), font, action=minimize_cows, text="-")
+
+# game ui
 next_step_button = Button((10, HEIGHT-47, 156, 30), small_font, action=next_step, text="draw a card")
 pause_menu = PauseMenu()
+turn_count_text = Text((10, 10, 300, 60), font, "first turn", "topleft")
 
 
 def join_sandbox():
     global viewing_screen
     viewing_screen = GAME_SCREEN
     play_sound(calming_ding_sound, 0.6)
-    get_local_player().draw_card(4)
+    get_local_player().draw_starting_hand()
     sandbox_button.pressed = False
+    get_local_player().in_sandbox = True
 
 
 def join_deck_builder():
@@ -124,7 +137,14 @@ debug_saved_packet_size = 0
 
 def make_new_deck():
     if len(deck_builder.decks) < deck_builder.max_decks:
-        deck_builder.create_deck(f"New Deck #{rand(0, 69420)}")  # hehe
+        deck_builder.create_deck(f"New Deck")
+    else:
+        add_popup(f"You can only have {deck_builder.max_decks} decks maximum")
+
+
+def copy_deck():
+    if len(deck_builder.decks) < deck_builder.max_decks:
+        deck_builder.copy_deck(deck_builder.selected_deck)
     else:
         add_popup(f"You can only have {deck_builder.max_decks} decks maximum")
 
@@ -171,20 +191,31 @@ def remove_card_from_sel_deck():
         deck_builder.selected_deck.loot_pool.pop(deck_add_list_items[deck_add_item_index])
 
 
+def see_different_card(move: int = 1):
+    global deck_add_item_index
+    deck_add_item_index = divmod(move+deck_add_item_index, len(deck_add_item_cards_list))[1]
+
+
 # deck selecter ui
 deck_select_space = 600
 deck_create_button = Button((10, 10, WIDTH/2-deck_select_space/2-20, 90), font, action=make_new_deck, text="Make new deck")
 deck_delete_button = Button((10, 110, WIDTH / 2 - deck_select_space / 2 - 20, 90), font, action=delete_deck, text="Delete selected deck")
+deck_copy_button = Button((10, 210, WIDTH/2 - deck_select_space/2-20, 90), font, action=copy_deck, text="Copy selected deck")
 deck_name_change = InputBox(pygame.Rect(WIDTH/2+deck_select_space/2+10, 10, WIDTH/2-deck_select_space/2-110, 40), small_font, text_if_no_text="deck name")
 deck_add_card_button = Button((10, HEIGHT-230, WIDTH/2-deck_select_space/2-20, 100), font, action=add_card_to_sel_deck, text="Add card to selected deck")
 deck_remove_card_button = Button((10, HEIGHT-120, WIDTH/2-deck_select_space/2-20, 100), font, action=remove_card_from_sel_deck, text="Remove card from selected deck")
 
 # deck selecter items list
-deck_add_item_index = 0
 deck_add_item_cards_list = {card.get_name(card): card for card in Card.__subclasses__()}
-_ = pygame.Rect(0, 0, WIDTH/2-deck_select_space/2-20, 50)
+deck_add_item_cards_list = dict(sorted(deck_add_item_cards_list.items(), reverse=True))
+deck_add_item_index = len(deck_add_item_cards_list)-1
+_ = pygame.Rect(0, 0, WIDTH/2-deck_select_space/2-20-80, 50)
 _.midbottom = deck_add_card_button.rect.midtop
 deck_add_item_rect = _.move(0, -10)
+deck_next_card_button = Button((0, 0, 30, 50), font, see_different_card)
+deck_next_card_button.rect.midright = deck_add_item_rect.move(-10, 0).midleft
+deck_prev_card_button = Button((0, 0, 30, 50), font, see_different_card, -1)
+deck_prev_card_button.rect.midleft = deck_add_item_rect.move(10, 0).midright
 
 # sounds
 coin_sound = pygame.mixer.Sound(join(getcwd(), "sounds", "coin.mp3"))
@@ -216,6 +247,7 @@ while running:
     if 255-(5*(tick-FRAMERATE)*DELTATIME) > 0:
         events = []
 
+    # game menu
     if viewing_screen == GAME_SCREEN:
         for event in events:
             if event.type == pygame.QUIT:
@@ -223,6 +255,9 @@ while running:
             if pause_menu.handle_events(event):
                 break
             ability_rcm = right_click_menu.handle_events(event)
+            if ability_rcm and get_local_player().step == "collect":
+                add_popup("You must draw a card first!")
+                ability_rcm = False
             if isinstance(ability_rcm, Ability):
                 ability_rcm.activate()
                 get_local_player().clear_queue()
@@ -296,6 +331,7 @@ while running:
         if not get_local_player().doing_input_action:
             exit_button.draw(screen)
             minimize_button.draw(screen)
+            turn_count_text.draw(screen)
 
         # currency particles
         remove_currency_particles = []
@@ -361,6 +397,14 @@ while running:
             server_input_box.handle_events(event)
             deck_build_button.handle_events(event)
 
+            # important ui
+            minimize_button.handle_events(event)
+            exit_button.handle_events(event)
+
+        # important ui
+        minimize_button.draw(screen)
+        exit_button.draw(screen)
+
         # draw ui elements
         join_server_button.draw(screen)
         sandbox_button.draw(screen)
@@ -375,15 +419,17 @@ while running:
                 if event.key == pygame.K_ESCAPE:
                     viewing_screen = MAIN_MENU_SCREEN
 
-            # new deck button
+            # new deck button and stuff
             deck_create_button.handle_events(event)
             deck_delete_button.handle_events(event)
+            deck_copy_button.handle_events(event)
             if deck_name_change.handle_events(event):
                 deck_builder.selected_deck.name = deck_name_change.text
 
             # important ui buttons
             exit_button.handle_events(event)
             minimize_button.handle_events(event)
+            back_button.handle_events(event)
 
             # handle cows popups
             handle_cows_popups(event)
@@ -406,21 +452,26 @@ while running:
             if event.type == pygame.MOUSEWHEEL:
                 if deck_add_item_rect.collidepoint(pygame.mouse.get_pos()):
                     deck_add_item_index = divmod(event.y+deck_add_item_index, len(deck_add_item_cards_list))[1]
+            deck_prev_card_button.handle_events(event)
+            deck_next_card_button.handle_events(event)
 
             # add and removing cards handling
             deck_add_card_button.handle_events(event)
             deck_remove_card_button.handle_events(event)
 
-        # draw new deck button
+        # draw new deck button and others
         deck_create_button.draw(screen)
         deck_delete_button.draw(screen)
         deck_name_change.draw(screen)
         deck_add_card_button.draw(screen)
         deck_remove_card_button.draw(screen)
+        deck_copy_button.draw(screen)
 
         # deck add item chooser
         pygame.draw.rect(screen, (0, 0, 0), deck_add_item_rect.inflate(4, 4), border_radius=3)
         pygame.draw.rect(screen, (255, 255, 255), deck_add_item_rect, border_radius=3)
+        deck_next_card_button.draw(screen)
+        deck_prev_card_button.draw(screen)
         sel_add_option = list(deck_add_item_cards_list.keys())[deck_add_item_index]
         card_add_surf = fetch_text(f"Will add: {sel_add_option}", font)
         screen.blit(card_add_surf, card_add_surf.get_rect(center=deck_add_item_rect.center))
@@ -439,6 +490,7 @@ while running:
 
         # important ui buttons
         exit_button.draw(screen)
+        back_button.draw(screen)
         minimize_button.draw(screen)
 
         # draw decks in middle column
@@ -450,7 +502,7 @@ while running:
             if id(deck) == deck_builder.selected_deck_id:
                 inner_color = pygame.Color(102, 153, 204)
             if rect.inflate(-16, -16).collidepoint(pygame.mouse.get_pos()):
-                inner_color = inner_color.lerp((0, 0, 0), pygame.mouse.get_pressed(3)[0]*0.5)
+                inner_color = inner_color.lerp((0, 0, 0), pygame.mouse.get_pressed(3)[0]*0.2)
             pygame.draw.rect(screen, inner_color, rect.inflate(-16, -16), border_radius=4)
             screen.blit(fetch_text(deck.name, font), fetch_text(deck.name, font).get_rect(center=rect.center))
 
@@ -478,7 +530,7 @@ while running:
         fps_text.draw(screen)
         mouse_pos_text.change(text=f"mouse pos: {pygame.mouse.get_pos()}")
         mouse_pos_text.draw(screen)
-        cashes_text.change(text=f"cache: {get_local_player().money}, {get_local_player().milk}, {get_local_player().hay}")
+        cashes_text.change(text=f"cache: {get_local_player().dollar}, {get_local_player().milk}, {get_local_player().hay}")
         cashes_text.draw(screen)
         camera_pos_text.change(text=f"{get_local_player().camera}")
         camera_pos_text.draw(screen)

@@ -133,7 +133,14 @@ class Field:
         self.land_bloom_out_anim: dict[int, float] = {}
 
     def draw(self, surface: pygame.Surface, framerate: int) -> None:
-        for card in self.cards:
+
+        def sort_by_anim(i: Card):
+            if id(i) in self.land_bloom_out_anim:
+                return self.land_bloom_out_anim[id(i)]
+            else:
+                return 0
+
+        for card in sorted(self.cards, key=sort_by_anim):
             if card.type == TYPE_LAND:
                 self.land_bloom_out_anim[id(card)] = self.land_bloom_out_anim.get(id(card), 0)
                 if card.get_rect().collidepoint(pygame.mouse.get_pos()):
@@ -168,7 +175,7 @@ class Field:
     def discard_card(self, card):
         """This is for animation support"""
         width, height = pygame.display.get_surface().get_size()
-        if self.cards.__contains__(card):
+        if card in self.cards:
             self.cards.remove(card)
             get_local_player().discarding_fake_cards.append(
                 FakeCard(card.image, card.mod_pos(), (width-160, height-130), grot=180, srot=180,
@@ -486,13 +493,14 @@ class Player:
                             get_local_player().clear_queue()
                             self.field.discard_card(card_field)
                         else:
-                            self.attempt_equip_card(card_field)
+                            self.attempt_equip_card(card_field)  # todo: make it so you dont pay for card when failed to find a thing to equip on to
                     else:
-                        play_sound_path(join("sounds", "error.mp3"))
-                        self.field.cards.remove(card_field)
-                        self.hand.cards.insert(self.index_of_grab, card_field)
-                        if get_local_player().step == "collect":
-                            add_popup("You must draw a card first!")
+                        if not card_field.was_on_field:
+                            self.field.cards.remove(card_field)
+                            self.hand.cards.insert(self.index_of_grab, card_field)
+                            play_sound_path(join("sounds", "error.mp3"))
+                            if get_local_player().step == "collect":
+                                add_popup("You must draw a card first!")
             return True
         if isinstance(card_field, bool):
             return True
@@ -577,7 +585,7 @@ class Player:
 
         # animals without a home
         not_homeless_cards = []
-        for card in [_ for _ in self.field.cards if _.type == TYPE_LAND]:
+        for card in [_ for _ in self.field.cards if _.type != TYPE_ANIMAL]:
             not_homeless_cards.extend(card.get_residents())
             not_homeless_cards.append(card)
         if len(self.field.cards) > len(not_homeless_cards):
@@ -587,7 +595,8 @@ class Player:
                     add_popup("This animal needs a home!")
                     return True
         elif len(self.field.cards) < len(not_homeless_cards):
-            raise ArithmeticError("Card is on two lands at once (probably)")
+            add_popup("Card is on two lands at once!")
+            return True
         return False
 
     def get_cards_recursively(self, rec_list=None):
@@ -877,8 +886,10 @@ def execute_action(action: Union[Action, DelayedAction, InputAction]) -> None:
             if action.action == DO_STEAL_MONEY_FROM_ALL_OPPONENTS:
                 get_local_player().dollar += get_statistics_manager().get_num_players() * action.amount
                 # todo: remove money from other players
-            if action.action == DO_DISCARD_THIS_CARD:
-                get_local_player().field.discard_card(action.card)
+
+        # non amount based things
+        if action.action == DO_DISCARD_THIS_CARD:
+            get_local_player().field.discard_card(action.card)
 
     elif isinstance(action, DelayedAction):
         # add delayed action to queue

@@ -267,6 +267,7 @@ while running:
                 for ability in ability_rcm:
                     ability.activate()
                 get_local_player().clear_queue()
+                break
             if event.type == pygame.MOUSEBUTTONDOWN:
                 if event.button == 3:
                     for card_rcm_hitbox in get_local_player().get_cards_recursively().__reversed__():

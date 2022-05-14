@@ -11,16 +11,24 @@ Its a fun game
 <br>Enjoy playing it I guess??
 
 ## Build Instructions:
-Install pyinstaller with pip using one of the following (may or may not work)
+Install pyinstaller with pip using one of the following (some may or may not work)
 ```
 python3 -m pip install PyInstaller
 py -m pip install PyInstaller
 pip3 install PyInstaller
 ```
-Use pyinstaller to build all the py files
-<br>I have a batch script do it for me and will not include it here
+Use pyinstaller to build the main.py file
+<br>For example, `py -m PyInstaller main.py --clean --F --noconsole`
+- `--noconsole` is used to prevent console from appearing when launching
+- `--clean` is used to prevent windows explorer from falsely detecting it as a virus
+- `-F` (shorthand for `--onefile`) makes it one file and removes ".dll" file clutter.
+
+Then, drag images and sound folders into the "dist" folder.<br>
+The "build" folder is not essential and can be deleted.
+
+I usually have a batch script do all this for me and will not include it here
 
 ## Art disclaimer
 In some of the art, I got lazy and started using scaled up emojis.
 <br>These emojis are Microsoft emojis so if Microsoft is seeing this than pls dont sue me for using your emojis in my art.
-<br>Also I made all the art using Paint 3D (also microsofts)
+<br>Also I made all the art using Paint 3D (also microsoft's)

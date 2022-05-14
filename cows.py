@@ -1153,6 +1153,7 @@ class SnakeEyes(Card):
         super().__init__(pos)
         self.cost_amount = 10
         self.cost_currency = MILK
+        self.is_cow = False
 
     def handle_action(self, action: int) -> Union[None, list[Action, DelayedAction, InputAction]]:
         if action == GE_SELF_TURN_START:
@@ -1221,6 +1222,7 @@ class GoldenCow(Card):
     def __init__(self, pos: Union[list[int], tuple[int, int]] = (100, 100)):
         super().__init__(pos)
         self.cost_amount = 5
+        self.is_cow = True
         self.cost_currency = HAY
         self.abilities = [[Ability(Action(self, DO_DISCARD_THIS_CARD, 0), 0, HAY, "Cash out"), Ability(Action(self, DO_SELF_GIVE_DOLLAR, 4), 0)]]
         # executes two actions, but acts as one ability.

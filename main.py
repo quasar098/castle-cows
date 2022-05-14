@@ -8,6 +8,7 @@ from deckbuilder import DeckBuilder
 
 # noinspection PyBroadException
 try:
+    # noinspection PyPackageRequirements
     from win32api import EnumDisplayDevices, EnumDisplaySettings
     FRAMERATE = EnumDisplaySettings(EnumDisplayDevices().DeviceName, -1).DisplayFrequency
 except Exception:  # for whatever reason, if cannot find it or error with the module
@@ -212,9 +213,9 @@ deck_add_item_index = len(deck_add_item_cards_list)-1
 _ = pygame.Rect(0, 0, WIDTH/2-deck_select_space/2-20-80, 50)
 _.midbottom = deck_add_card_button.rect.midtop
 deck_add_item_rect = _.move(0, -10)
-deck_next_card_button = Button((0, 0, 30, 50), font, see_different_card)
+deck_next_card_button = Button((0, 0, 30, 50), font, see_different_card, text="<")
 deck_next_card_button.rect.midright = deck_add_item_rect.move(-10, 0).midleft
-deck_prev_card_button = Button((0, 0, 30, 50), font, see_different_card, -1)
+deck_prev_card_button = Button((0, 0, 30, 50), font, see_different_card, -1, text=">")
 deck_prev_card_button.rect.midleft = deck_add_item_rect.move(10, 0).midright
 
 # sounds
@@ -412,7 +413,7 @@ while running:
         deck_build_button.draw(screen)
 
     # deck builder menu
-    if viewing_screen == DECK_SELECT_SCREEN:
+    elif viewing_screen == DECK_SELECT_SCREEN:
         deck_name_change.change(text=deck_builder.selected_deck.name, font=small_font)
         for event in events:
             if event.type == pygame.KEYDOWN:

@@ -1,6 +1,5 @@
 # Castle Cows
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
-[![lines of code](https://img.shields.io/tokei/lines/github/quasar098/castle-cows)](https://quasar098.github.io)
 [![trello board](https://img.shields.io/badge/todo%20board-trello-blue.svg)](https://trello.com/b/5BatIDc3/todo)
 
 ## How to play:
@@ -8,7 +7,8 @@ Rulebook still unavailible. Will be put in game when the game is ready.
 
 ## Purpose:
 Its a fun game
-<br>Enjoy playing it I guess??
+<br>You can beat other people at dairy farming
+<br>You can make an overpowered cow farm
 
 ## Build Instructions:
 Install pyinstaller with pip using one of the following (some may or may not work)

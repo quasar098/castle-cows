@@ -181,6 +181,9 @@ class Field:
                 FakeCard(card.image, card.mod_pos(), (width-160, height-130), grot=180, srot=180,
                          anim_time=0.7, real_card=card, endsize=(150, 197)))
 
+    def max_animals_allowed(self) -> int:
+        return sum([land.max_capacity for land in self.cards if land.type == TYPE_LAND])
+
 
 class Camera:
     def __init__(self, pos: tuple[int, int]):
@@ -233,6 +236,10 @@ class Player:
         self.visible_milk = self.milk
         self.visible_hay = self.hay
         currency_particles = []
+
+    @property
+    def currencies(self):
+        return {DOLLAR: self.dollar, HAY: self.hay, MILK: self.milk}
 
     def draw(self, surface: pygame.Surface, font: pygame.font.Font):
         # ratios and div numbers
@@ -476,24 +483,27 @@ class Player:
                 else:
                     # on your field
                     if get_local_player().step == "use":
-                        if not card_field.was_on_field:
-                            if not remove_currency_if_has(card_field.cost_currency, card_field.cost_amount):
+                        if not card_field.was_on_field:  # has not payed for it yet
+                            if not has_required_cash(card_field.cost_currency, card_field.cost_amount):
                                 self.field.cards.remove(card_field)
                                 self.hand.cards.insert(self.index_of_grab, card_field)
                                 add_popup("You don't have enough wealth")
                                 return True
+                            if card_field.type == TYPE_INCANTATION:
+                                for ability in card_field.abilities:
+                                    if isinstance(ability, list):
+                                        for ab2 in ability:
+                                            ab2.activate()
+                                    ability.activate()
+                                get_local_player().clear_queue()
+                                self.field.discard_card(card_field)
+                            else:
+                                if card_field.type == TYPE_EQUIPMENT:
+                                    if not self.attempt_equip_card(card_field):
+                                        return True
+                            remove_currency_if_has(card_field.cost_currency, card_field.cost_amount)
                             card_field.was_on_field = True
                             play_sound_path(join("sounds", "cardfold.mp3"), 0.4)
-                        if card_field.type == TYPE_INCANTATION:
-                            for ability in card_field.abilities:
-                                if isinstance(ability, list):
-                                    for ab2 in ability:
-                                        ab2.activate()
-                                ability.activate()
-                            get_local_player().clear_queue()
-                            self.field.discard_card(card_field)
-                        else:
-                            self.attempt_equip_card(card_field)  # todo: make it so you dont pay for card when failed to find a thing to equip on to
                     else:
                         if not card_field.was_on_field:
                             self.field.cards.remove(card_field)
@@ -519,7 +529,7 @@ class Player:
                 self.field.cards.remove(hit)
                 self.hand.cards.append(hit)
 
-    def attempt_equip_card(self, card_find):
+    def attempt_equip_card(self, card_find) -> bool:
         card_find: Card
         card_find.selected = False
         if card_find.type == TYPE_EQUIPMENT:
@@ -531,13 +541,14 @@ class Player:
                             if good_types.__contains__(card.type):
                                 self.field.cards.remove(card_find)
                                 card.equipped.append(card_find)
-                                return
+                                return True
             # could not find a card to go on top of
             if self.field.cards.__contains__(card_find):  # assert is not null (same as above)
                 self.field.cards.remove(card_find)
                 self.hand.cards.append(card_find)
             add_popup(f"You cannot do that there!")
             play_sound_path(join("sounds", "error.mp3"))
+            return False
 
     def next_turn_step(self):
 
@@ -799,7 +810,7 @@ def mod_x(x):
 def replace_placeholder(var_placeholder: int):
     if var_placeholder == PL_SELF_TURNS_PASSED:
         return get_statistics_manager().turns_passed
-    if var_placeholder == PL_SELF_MONEY_AMOUNT:
+    if var_placeholder == PL_SELF_DOLLAR_AMOUNT:
         return get_local_player().dollar
     if var_placeholder == PL_SELF_MILK_AMOUNT:
         return get_local_player().milk
@@ -829,6 +840,10 @@ def mod_pos(x, y, inv=False):
         return mod_x(x), mod_y(y)
     else:
         return x+get_local_player().camera.x, y+get_local_player().camera.y
+
+
+def has_required_cash(currency_type: int, amount: int) -> bool:
+    return get_local_player().currencies[currency_type] >= amount
 
 
 def remove_currency_if_has(currency_type: int, amount: int) -> bool:
@@ -883,7 +898,7 @@ def execute_action(action: Union[Action, DelayedAction, InputAction]) -> None:
             if action.action == DO_SELF_GIVE_HAY:
                 get_local_player().hay += 1
                 currency_particles.append(CurrencyParticle(particle_pos, HAY))
-            if action.action == DO_STEAL_MONEY_FROM_ALL_OPPONENTS:
+            if action.action == DO_STEAL_DOLLAR_FROM_ALL_OPPONENTS:
                 get_local_player().dollar += get_statistics_manager().get_num_players() * action.amount
                 # todo: remove money from other players
 
@@ -1087,7 +1102,7 @@ class GreenestGrass(Card):
         self.cost_amount = 3
         self.cost_currency = HAY
         self.abilities = [Ability(Action(self, DO_SELF_GIVE_DOLLAR, 1), 1, MILK, "Get 1"),
-                          [Ability(Action(self, DO_STEAL_MONEY_FROM_ALL_OPPONENTS, 1), 1, HAY, "Take 1 from everyone")]]
+                          [Ability(Action(self, DO_STEAL_DOLLAR_FROM_ALL_OPPONENTS, 1), 1, HAY, "Take 1 from everyone")]]
         self.can_go_on = TYPE_ANIMAL
 
 

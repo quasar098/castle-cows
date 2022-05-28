@@ -245,7 +245,7 @@ while running:
         events.insert(0, hit_target)
 
     # dont register events until blackscreen starts fading
-    if 255-(5*(tick-FRAMERATE)*DELTATIME) > 0:
+    if tick/FRAMERATE < 1.3:
         events = []
 
     # game menu

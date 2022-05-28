@@ -539,6 +539,9 @@ class Player:
                         if self.field.cards.__contains__(card_find):  # assert is not null
                             good_types = (card_find.can_go_on if isinstance(card_find.can_go_on, tuple) else (card_find.can_go_on,))
                             if good_types.__contains__(card.type):
+                                if card_find.cow_exclusive:
+                                    if not card.is_cow:
+                                        continue
                                 self.field.cards.remove(card_find)
                                 card.equipped.append(card_find)
                                 return True
@@ -602,9 +605,10 @@ class Player:
         if len(self.field.cards) > len(not_homeless_cards):
             for card in self.field.cards:
                 if not not_homeless_cards.__contains__(card):
-                    camera_to_card(card)
-                    add_popup("This animal needs a home!")
-                    return True
+                    if not card.has_equipment(FluxCapacitor):
+                        camera_to_card(card)
+                        add_popup("This animal needs a home!")
+                        return True
         elif len(self.field.cards) < len(not_homeless_cards):
             add_popup("Card is on two lands at once!")
             return True
@@ -956,6 +960,7 @@ class Card:
         # equipment shenanies
         self.equipped: list[Card] = []
         self.can_go_on: Union[int, tuple[int, ...]] = TYPE_ANIMAL, TYPE_TALISMAN, TYPE_EQUIPMENT, TYPE_LAND, TYPE_INCANTATION
+        self.cow_exclusive = False
 
         # other
         self.is_cow = False
@@ -972,6 +977,12 @@ class Card:
 
     def mod_pos(self):
         return self.mod_x(), self.mod_y()
+
+    def has_equipment(self, class_type):
+        for equip in self.equipped:
+            if isinstance(equip, class_type):
+                return True
+        return False
 
     def reset_abilities(self, ablist: Union[None, list[Ability]] = None):
         if ablist is None:
@@ -1257,3 +1268,15 @@ class GoldenCow(Card):
     def handle_action(self, action: int) -> Union[None, list[Action, DelayedAction, InputAction]]:
         if action == GE_SELF_TURN_START:
             return [Action(self, DO_SELF_GIVE_DOLLAR, 2)]
+
+
+class FluxCapacitor(Card):
+    image = "flux_capacitor.png"
+    type = TYPE_EQUIPMENT
+
+    def __init__(self, pos: Union[list[int], tuple[int, int]] = (100, 100)):
+        super().__init__(pos)
+        self.cost_amount = 3
+        self.cost_currency = DOLLAR
+        self.can_go_on = TYPE_ANIMAL
+        self.cow_exclusive = True

@@ -1152,6 +1152,7 @@ class SizeableJaws(Card):
         super().__init__(pos)
         self.cost_amount = 2
         self.cost_currency = MILK
+        self.can_go_on = (TYPE_ANIMAL,)
 
     def handle_action(self, action: int) -> Union[None, list[Action, DelayedAction, InputAction]]:
         if action == GE_SELF_TURN_START:

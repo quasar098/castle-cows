@@ -11,10 +11,14 @@ Its a fun game
 <br>You can make an overpowered cow farm
 
 ## Build Instructions:
-Install pyinstaller with pip using one of the following (some may or may not work)
+**NOTE: IF A `pip3` COMMAND DOES NOT WORK, TRY REPLACING IT WITH `py -m pip` OR `python3 -m pip` INSTEAD**
+
+Install the requirements in requirements.txt using
 ```
-python3 -m pip install PyInstaller
-py -m pip install PyInstaller
+pip3 install -r requirements.txt
+```
+Install pyinstaller with pip using
+```
 pip3 install PyInstaller
 ```
 Use pyinstaller to build the main.py file

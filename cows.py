@@ -263,8 +263,8 @@ class Player:
 
         # money text
         money_text_pos = _move_pos(money_rectangle.topleft, (box_width/2, text_height_from_top))
-        surface.blit(fetch_text(f"{self.visible_money}", font),
-                     fetch_text(f"{self.visible_money}", font).get_rect(midtop=money_text_pos))
+        surface.blit(fetch_text(f"{clamp(self.visible_money, 0, 69420)}", font),
+                     fetch_text(f"{clamp(self.visible_money, 0, 69420)}", font).get_rect(midtop=money_text_pos))
         surface.blit(get_image(join("images", "money.png")), money_rectangle.topleft)
 
         # milk border
@@ -276,7 +276,7 @@ class Player:
 
         # milk text
         milk_text_pos = _move_pos(milk_rectangle.topleft, (box_width/2, text_height_from_top))
-        surface.blit(fetch_text(f"{self.visible_milk}", font), fetch_text(f"{self.visible_milk}", font).get_rect(midtop=milk_text_pos))
+        surface.blit(fetch_text(f"{clamp(self.visible_milk, 0, 69420)}", font), fetch_text(f"{clamp(self.visible_milk, 0, 69420)}", font).get_rect(midtop=milk_text_pos))
         surface.blit(get_image(join("images", "milk.png")), milk_rectangle.topleft)
 
         # hay border
@@ -288,7 +288,7 @@ class Player:
 
         # hay text
         hay_text_pos = _move_pos(hay_rectangle.topleft, (box_width/2, text_height_from_top))
-        surface.blit(fetch_text(f"{self.visible_hay}", font), fetch_text(f"{self.visible_hay}", font).get_rect(midtop=hay_text_pos))
+        surface.blit(fetch_text(f"{clamp(self.visible_hay, 0, 69420)}", font), fetch_text(f"{clamp(self.visible_hay, 0, 69420)}", font).get_rect(midtop=hay_text_pos))
         surface.blit(get_image(join("images", "hay.png")), hay_rectangle.topleft)
 
         # discard pile

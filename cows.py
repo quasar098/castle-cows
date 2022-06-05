@@ -594,6 +594,10 @@ class Player:
         # overcrowding on lands:
         for card in [_ for _ in self.field.cards if _.type == TYPE_LAND and _.was_on_field]:
             if card.land_max_capacity is not None:
+                if card.land_max_capacity == 0:
+                    camera_to_card(card)
+                    add_popup("This land can't have any animals!")
+                    return True
                 if len(card.get_residents()) > card.land_max_capacity:
                     camera_to_card(card)
                     add_popup("Too many animals on this land!")
@@ -678,6 +682,9 @@ class Player:
         return False
 
     def handle_card_actions(self, action: int):
+
+        if action in (GE_SELF_TURN_START,):
+            self.handle_card_actions(GE_ANY_TURN_START)
 
         # run delayed actions
         delayed_action_kill_list = []
@@ -900,7 +907,14 @@ def execute_action(action: Union[Action, DelayedAction, InputAction]) -> None:
         particle_pos = _move_pos(action.card.mod_pos(), (125, 162))
 
         # add X particles where X is the amount
-        for _ in range(amount):
+        multiplier = 1
+        _s = action.card.get_land_im_on(get_local_player())
+        if _s is not None:
+            _s = _s.land_buff_animal_multipliers
+            for mul_class in _s:
+                if isinstance(action.card, mul_class):
+                    multiplier *= _s[mul_class]
+        for _ in range(amount*multiplier):
             if action.action == DO_SELF_GIVE_DOLLAR:
                 get_local_player().dollar += 1
                 currency_particles.append(CurrencyParticle(particle_pos, DOLLAR))
@@ -915,6 +929,11 @@ def execute_action(action: Union[Action, DelayedAction, InputAction]) -> None:
                 # todo: remove money from other players
             if action.action == DO_SELF_DRAW_DAIRY_COW:
                 get_local_player().draw_card(action.amount, DairyCow)
+            if action.action == DO_SELF_DRAW_MANURE:
+                get_local_player().draw_card(action.amount, Manure)
+            if action.action == DO_TAKE_TOP_DISCARD_CARD:
+                get_local_player().hand.cards.append(get_local_player().discard_pile[len(get_local_player().discard_pile)-1])
+                get_local_player().discard_pile.pop(len(get_local_player().discard_pile)-1)
 
         # non amount based things
         if action.action == DO_DISCARD_THIS_CARD:
@@ -979,7 +998,7 @@ class Card:
 
         # inhabitant
         self.land_max_capacity = None
-        self.land_buff_animal_multipliers = {}  # (ex: {Card: 2, Pig: 3} means that all cards are buffed x2 total, pigs are buffed x6 total)
+        self.land_buff_animal_multipliers = {}  # (ex: {Pig: 3} means pigs are buffed x3)
         # todo add land multipliers funmctionality
 
     def mod_x(self):
@@ -1386,3 +1405,92 @@ class DairyCow(Card):
     def handle_action(self, action: int) -> Union[None, list[Action, DelayedAction, InputAction]]:
         if action == GE_SELF_TURN_START:
             return [Action(self, DO_SELF_GIVE_MILK, 2)]
+
+
+class ScientificResearchBook(Card):
+    image = "scientific_research_book.png"
+    type = TYPE_TALISMAN
+
+    def __init__(self, pos: Union[list[int], tuple[int, int]] = (100, 100)):
+        super().__init__(pos)
+        self.cost_amount = 0
+        self.cost_currency = DOLLAR
+
+
+class SwissCows(Card):
+    image = "swiss_cows.png"
+    type = TYPE_TALISMAN
+
+    def __init__(self, pos: Union[list[int], tuple[int, int]] = (100, 100)):
+        super().__init__(pos)
+        self.cost_amount = 1
+        self.cost_currency = MILK
+
+    def handle_action(self, action: int) -> Union[None, list[Action, DelayedAction, InputAction]]:
+        if action == GE_ANY_TURN_START:
+            return [Action(self, DO_SELF_GIVE_MILK, 1)]
+
+
+class GoldenField(Card):
+    image = "golden_field.png"
+    type = TYPE_LAND
+
+    def __init__(self, pos: Union[list[int], tuple[int, int]] = (100, 100)):
+        super().__init__(pos)
+        self.cost_amount = 10
+        self.cost_currency = DOLLAR
+        self.land_buff_animal_multipliers = {GoldenCow: 2}
+        self.land_max_capacity = 2
+
+
+class Manure(Card):
+    image = "manure.png"
+    type = TYPE_EQUIPMENT
+
+    def __init__(self, pos: Union[list[int], tuple[int, int]] = (100, 100)):
+        super().__init__(pos)
+        self.cost_amount = 10
+        self.cost_currency = MILK
+
+    def handle_action(self, action: int) -> Union[None, list[Action, DelayedAction, InputAction]]:
+        if action == GE_SELF_TURN_START:
+            return [Action(self, DO_SELF_GIVE_MILK, PL_SELF_NUM_COWS_ON_FIELD)]
+
+
+class DiarrheaPlanet(Card):
+    image = "diarrhea_planet.png"
+    type = TYPE_TALISMAN
+
+    def __init__(self, pos: Union[list[int], tuple[int, int]] = (100, 100)):
+        super().__init__(pos)
+        self.cost_amount = 5
+        self.cost_currency = HAY
+
+    def handle_action(self, action: int) -> Union[None, list[Action, DelayedAction, InputAction]]:
+        if action == GE_SELF_TURN_START:
+            return [Action(self, DO_SELF_DRAW_MANURE, 1)]
+
+
+class Necromancy(Card):
+    image = "necromancy.png"
+    type = TYPE_INCANTATION
+
+    def __init__(self, pos: Union[list[int], tuple[int, int]] = (100, 100)):
+        super().__init__(pos)
+        self.cost_amount = 0
+        self.cost_currency = DOLLAR
+        self.abilities = [Ability(Action(self, DO_TAKE_TOP_DISCARD_CARD, 1), 0, DOLLAR)]
+
+
+class UnstoppableMomentum(Card):
+    image = "unstoppable_momentum.png"
+    type = TYPE_TALISMAN
+
+    def __init__(self, pos: Union[list[int], tuple[int, int]] = (100, 100)):
+        super().__init__(pos)
+        self.cost_amount = 6
+        self.cost_currency = HAY
+
+    def handle_action(self, action: int) -> Union[None, list[Action, DelayedAction, InputAction]]:
+        if action == GE_SELF_PLAY_CARD:
+            return [Action(self, DO_SELF_GIVE_HAY, 2)]

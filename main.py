@@ -280,7 +280,7 @@ while running:
                                 card_right_click_list.append(RightClickOption(f"[debug] get pos",
                                                                               lambda: add_debug_popup(f"{card_rcm_hitbox.x, card_rcm_hitbox.y}")))
                                 card_right_click_list.append(RightClickOption(f"[debug] is cow?",
-                                                                              lambda: add_debug_popup(f"{card_rcm_hitbox.is_cow}")))
+                                                                              lambda: add_debug_popup(f"{card_rcm_hitbox.card_is_cow}")))
                             for ability in card_rcm_hitbox.abilities:
                                 if isinstance(ability, list):
                                     ab2 = ability[0]

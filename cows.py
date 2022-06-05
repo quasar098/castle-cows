@@ -182,7 +182,7 @@ class Field:
                          anim_time=0.7, real_card=card, endsize=(150, 197)))
 
     def max_animals_allowed(self) -> int:
-        return sum([land.max_capacity for land in self.cards if land.type == TYPE_LAND])
+        return sum([land.land_max_capacity for land in self.cards if land.type == TYPE_LAND])
 
 
 class Camera:
@@ -200,9 +200,10 @@ class Player:
     def __init__(self, name: str):
 
         # important stuff
-        self.dollar: int = 5
-        self.milk: int = 5
-        self.hay: int = 5
+        self.dollar: int = 25
+        self.milk: int = 25
+        self.hay: int = 25
+        # todo change these back when finished beta
         self.username = name
         self.field: Field = Field()
         self.hand: Hand = Hand()
@@ -425,7 +426,7 @@ class Player:
                             action = self.action_queue[0]
                             card_type_interpreter = {
                                 PICK_CARD: lambda _: True,
-                                PICK_COW: lambda _: _.is_cow,
+                                PICK_COW: lambda _: _.card_is_cow,
                                 PICK_PLAYER: lambda _: False,
                                 PICK_LAND: lambda _: _.type == TYPE_LAND,
                                 PICK_ANIMAL: lambda _: _.type == TYPE_ANIMAL
@@ -504,6 +505,7 @@ class Player:
                             remove_currency_if_has(card_field.cost_currency, card_field.cost_amount)
                             card_field.was_on_field = True
                             play_sound_path(join("sounds", "cardfold.mp3"), 0.4)
+                            self.handle_card_actions(GE_SELF_PLAY_CARD)
                     else:
                         if not card_field.was_on_field:
                             self.field.cards.remove(card_field)
@@ -537,10 +539,10 @@ class Player:
                 if id(card) != id(card_find):
                     if card.get_rect().collidepoint(pygame.mouse.get_pos()):  # card dragged on card
                         if self.field.cards.__contains__(card_find):  # assert is not null
-                            good_types = (card_find.can_go_on if isinstance(card_find.can_go_on, tuple) else (card_find.can_go_on,))
+                            good_types = (card_find.equipment_can_go_on if isinstance(card_find.equipment_can_go_on, tuple) else (card_find.equipment_can_go_on,))
                             if good_types.__contains__(card.type):
-                                if card_find.cow_exclusive:
-                                    if not card.is_cow:
+                                if card_find.equipment_is_cow_exclusive:
+                                    if not card.card_is_cow:
                                         continue
                                 self.field.cards.remove(card_find)
                                 card.equipped.append(card_find)
@@ -591,8 +593,8 @@ class Player:
 
         # overcrowding on lands:
         for card in [_ for _ in self.field.cards if _.type == TYPE_LAND and _.was_on_field]:
-            if card.max_capacity is not None:
-                if len(card.get_residents()) > card.max_capacity:
+            if card.land_max_capacity is not None:
+                if len(card.get_residents()) > card.land_max_capacity:
                     camera_to_card(card)
                     add_popup("Too many animals on this land!")
                     return True
@@ -650,15 +652,21 @@ class Player:
         else:
             self.draw_card()
 
-    def draw_card(self, amount=1):
-        cards = list(self.loot_pool.keys())
-        weights = list(self.loot_pool.values())
-        for card_drawn in randchoice(cards, weights=weights, k=amount):
-            card_var = card_drawn()
-            width, height = pygame.display.get_surface().get_size()
-            # noinspection PyTypeChecker
-            self.drawing_fake_cards.append(FakeCard(card_var.image, (width/2-125, -250), (width/2-125, height/2-162),
-                                                    anim_time=0.6, real_card=card_var))
+    def draw_card(self, amount=1, card_class=None):
+        width, height = pygame.display.get_surface().get_size()
+        if card_class is None:
+            cards = list(self.loot_pool.keys())
+            weights = list(self.loot_pool.values())
+            for card_drawn in randchoice(cards, weights=weights, k=amount):
+                card_var = card_drawn()
+                # noinspection PyTypeChecker
+                self.drawing_fake_cards.append(FakeCard(card_var.image, (width/2-125, -250), (width/2-125, height/2-162),
+                                                        anim_time=0.6, real_card=card_var))
+        else:
+            for _ in range(amount):
+                # noinspection PyTypeChecker
+                self.drawing_fake_cards.append(FakeCard(card_class.image, (width/2-125, -250), (width/2-125, height/2-162),
+                                                        anim_time=0.6, real_card=card_class()))
 
     def can_pay_for(self, currency: int, cost: int) -> bool:
         """If the player can pay for a certain item, return true"""
@@ -732,7 +740,7 @@ class StatisticsManager:
         self.last_cow_chosen = None
 
     def get_num_cows(self):
-        return len([card_cow for card_cow in get_local_player().get_cards_recursively() if card_cow.is_cow])
+        return len([card_cow for card_cow in get_local_player().get_cards_recursively() if card_cow.card_is_cow])
 
     def get_num_players(self):
         return 1
@@ -905,6 +913,8 @@ def execute_action(action: Union[Action, DelayedAction, InputAction]) -> None:
             if action.action == DO_STEAL_DOLLAR_FROM_ALL_OPPONENTS:
                 get_local_player().dollar += get_statistics_manager().get_num_players() * action.amount
                 # todo: remove money from other players
+            if action.action == DO_SELF_DRAW_DAIRY_COW:
+                get_local_player().draw_card(action.amount, DairyCow)
 
         # non amount based things
         if action.action == DO_DISCARD_THIS_CARD:
@@ -952,22 +962,25 @@ class Card:
         self.selected = False
         self.abilities: list[Union[Ability, list[Ability]]] = []  # can be [Ability()] or [Ability(), [Ability(), Ability()]] etc
         self.was_on_field = False
+        self.equipped: list[Card] = []
 
         # cost stuff
         self.cost_amount: int = 0
         self.cost_currency: int = DOLLAR
 
-        # equipment shenanies
-        self.equipped: list[Card] = []
-        self.can_go_on: Union[int, tuple[int, ...]] = TYPE_ANIMAL, TYPE_TALISMAN, TYPE_EQUIPMENT, TYPE_LAND, TYPE_INCANTATION
-        self.cow_exclusive = False
+        # equipment
+        self.equipment_can_go_on: Union[int, tuple[int, ...]] = TYPE_ANIMAL, TYPE_TALISMAN, TYPE_EQUIPMENT, TYPE_LAND, TYPE_INCANTATION
+        self.equipment_is_cow_exclusive = False
 
         # other
-        self.is_cow = False
+        self.card_is_cow = False
+        self.card_buff_equipment_multipliers = {}  # same as land multipliers but buffs the card (all numbers)
+        # todo add this
 
-        # inhabitant shenanies
-        self.max_capacity = None
-        self.multipliers = {}  # (ex: {Card: 2, Pig: 3} means that all cards are buffed x2 total, pigs are buffed x6 total)
+        # inhabitant
+        self.land_max_capacity = None
+        self.land_buff_animal_multipliers = {}  # (ex: {Card: 2, Pig: 3} means that all cards are buffed x2 total, pigs are buffed x6 total)
+        # todo add land multipliers funmctionality
 
     def mod_x(self):
         return self.x-get_local_player().camera.x
@@ -1095,7 +1108,7 @@ class Castle(Card):
 
     def __init__(self, pos: Union[list[int], tuple[int, int]] = (100, 100)):
         super().__init__(pos)
-        self.max_capacity = 3
+        self.land_max_capacity = 3
         # cost is free
 
     def handle_action(self, action: int) -> Union[list[Action, DelayedAction, InputAction], None]:
@@ -1114,7 +1127,7 @@ class GreenestGrass(Card):
         self.cost_currency = HAY
         self.abilities = [Ability(Action(self, DO_SELF_GIVE_DOLLAR, 1), 1, MILK, "Get 1"),
                           [Ability(Action(self, DO_STEAL_DOLLAR_FROM_ALL_OPPONENTS, 1), 1, HAY, "Take 1 from everyone")]]
-        self.can_go_on = TYPE_ANIMAL
+        self.equipment_can_go_on = TYPE_ANIMAL
 
 
 class KingCow(Card):
@@ -1123,7 +1136,7 @@ class KingCow(Card):
 
     def __init__(self, pos: Union[list[int], tuple[int, int]] = (100, 100)):
         super().__init__(pos)
-        self.is_cow = True
+        self.card_is_cow = True
         self.cost_amount = 1
         self.cost_currency = HAY
         self.abilities = [Ability(Action(self, DO_SELF_GIVE_MILK, PL_SELF_NUM_COWS_ON_FIELD), 1, HAY, "Milk the poor"),
@@ -1163,7 +1176,7 @@ class SizeableJaws(Card):
         super().__init__(pos)
         self.cost_amount = 2
         self.cost_currency = MILK
-        self.can_go_on = (TYPE_ANIMAL,)
+        self.equipment_can_go_on = (TYPE_ANIMAL,)
 
     def handle_action(self, action: int) -> Union[None, list[Action, DelayedAction, InputAction]]:
         if action == GE_SELF_TURN_START:
@@ -1179,7 +1192,7 @@ class PocketCow(Card):
         super().__init__(pos)
         self.cost_amount = 2
         self.cost_currency = HAY
-        self.is_cow = True
+        self.card_is_cow = True
         self.abilities = [Ability(Action(self, DO_SELF_GIVE_HAY, 1), 1, MILK, "Leave it in your pocket")]
 
 
@@ -1191,7 +1204,7 @@ class SnakeEyes(Card):
         super().__init__(pos)
         self.cost_amount = 10
         self.cost_currency = MILK
-        self.is_cow = False
+        self.card_is_cow = False
 
     def handle_action(self, action: int) -> Union[None, list[Action, DelayedAction, InputAction]]:
         if action == GE_SELF_TURN_START:
@@ -1218,7 +1231,7 @@ class FarmLand(Card):
         super().__init__(pos)
         self.cost_amount = 2
         self.cost_currency = HAY
-        self.max_capacity = 3
+        self.land_max_capacity = 3
 
     def handle_action(self, action: int) -> Union[None, list[Action, DelayedAction, InputAction]]:
         if action == GE_SELF_TURN_START:
@@ -1234,7 +1247,7 @@ class FarmerCow(Card):
         super().__init__(pos)
         self.cost_amount = 2
         self.cost_currency = HAY
-        self.is_cow = True
+        self.card_is_cow = True
         self.abilities = [Ability(DelayedAction(self, DO_SELF_GIVE_HAY, 2, GE_SELF_TURN_START), 1, HAY, "Late harvest")]
 
     def handle_action(self, action: int) -> Union[None, list[Action, DelayedAction, InputAction]]:
@@ -1260,7 +1273,7 @@ class GoldenCow(Card):
     def __init__(self, pos: Union[list[int], tuple[int, int]] = (100, 100)):
         super().__init__(pos)
         self.cost_amount = 5
-        self.is_cow = True
+        self.card_is_cow = True
         self.cost_currency = HAY
         self.abilities = [[Ability(Action(self, DO_DISCARD_THIS_CARD, 0), 0, HAY, "Cash out"), Ability(Action(self, DO_SELF_GIVE_DOLLAR, 4), 0)]]
         # executes two actions, but acts as one ability.
@@ -1279,4 +1292,97 @@ class FluxCapacitor(Card):
         self.cost_amount = 3
         self.cost_currency = DOLLAR
         self.can_go_on = TYPE_ANIMAL
-        self.cow_exclusive = True
+        self.equipment_is_cow_exclusive = True
+
+
+class HomelessShelter(Card):
+    image = "homeless_shelter.png"
+    type = TYPE_LAND
+
+    def __init__(self, pos: Union[list[int], tuple[int, int]] = (100, 100)):
+        super().__init__(pos)
+        self.cost_amount = 3
+        self.cost_currency = DOLLAR
+        self.land_max_capacity = 4
+
+
+class TraderCow(Card):
+    image = "trader_cow.png"
+    type = TYPE_ANIMAL
+
+    def __init__(self, pos: Union[list[int], tuple[int, int]] = (100, 100)):
+        super().__init__(pos)
+        self.cost_amount = 2
+        self.cost_currency = DOLLAR
+        self.card_is_cow = True
+        self.abilities = [Ability(Action(self, DO_SELF_GIVE_DOLLAR, 2), 12, MILK, "Milk and silk road")]
+
+
+class Sunglasses(Card):
+    image = "sunglasses.png"
+    type = TYPE_EQUIPMENT
+
+    def __init__(self, pos: Union[list[int], tuple[int, int]] = (100, 100)):
+        super().__init__(pos)
+        self.cost_amount = 10
+        self.cost_currency = MILK
+
+    def handle_action(self, action: int) -> Union[None, list[Action, DelayedAction, InputAction]]:
+        if action == GE_SELF_TURN_START:
+            return [Action(self, DO_SELF_GIVE_MILK, 3)]
+
+
+class NewKeyboard(Card):
+    image = "new_keyboard.png"
+    type = TYPE_TALISMAN
+
+    def __init__(self, pos: Union[list[int], tuple[int, int]] = (100, 100)):
+        super().__init__(pos)
+        self.cost_amount = 7
+        self.cost_currency = DOLLAR
+
+    def handle_action(self, action: int) -> Union[None, list[Action, DelayedAction, InputAction]]:
+        if action == GE_SELF_PLAY_CARD:
+            return [Action(self, DO_SELF_GIVE_DOLLAR, 1)]
+
+
+class DiamondCow(Card):
+    image = "diamond_cow.png"
+    type = TYPE_ANIMAL
+
+    def __init__(self, pos: Union[list[int], tuple[int, int]] = (100, 100)):
+        super().__init__(pos)
+        self.cost_amount = 8
+        self.cost_currency = DOLLAR
+        self.card_is_cow = True
+
+    def handle_action(self, action: int) -> Union[None, list[Action, DelayedAction, InputAction]]:
+        if action == GE_SELF_TURN_START:
+            return [Action(self, DO_SELF_GIVE_DOLLAR, 3)]
+
+
+class DairyCowStore(Card):
+    image = "dairy_cow_store.png"
+    type = TYPE_LAND
+
+    def __init__(self, pos: Union[list[int], tuple[int, int]] = (100, 100)):
+        super().__init__(pos)
+        self.cost_amount = 8
+        self.cost_currency = HAY
+        self.abilities = [Ability(Action(self, DO_SELF_DRAW_DAIRY_COW, 1), 2, DOLLAR, "Buy a dairy cow")]
+        self.land_max_capacity = 0
+
+
+class DairyCow(Card):
+    image = "dairy_cow.png"
+    type = TYPE_ANIMAL
+
+    def __init__(self, pos: Union[list[int], tuple[int, int]] = (100, 100)):
+        super().__init__(pos)
+        self.cost_amount = 2
+        self.cost_currency = DOLLAR
+        self.card_buff_multipliers = {GreenestGrass: 2}
+
+    def handle_action(self, action: int) -> Union[None, list[Action, DelayedAction, InputAction]]:
+        if action == GE_SELF_TURN_START:
+            return [Action(self, DO_SELF_GIVE_MILK, 2)]

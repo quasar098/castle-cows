@@ -3,6 +3,7 @@ from typing import Any, Union, Callable
 from numpy import clip as clamp, pi, cos
 from os import getcwd
 from os.path import join
+from time import perf_counter as perftime
 
 # yugo tools version 1
 
@@ -10,6 +11,16 @@ YUGO_FRAMERATE = 60
 looping = False
 images_storage: dict[str, pygame.Surface] = {}
 texts_storage: dict[str, pygame.Surface] = {}
+last_time = 0
+
+
+def debug_time(name):
+    global last_time
+    new = perftime()
+    diff = new-last_time
+    print(diff, name)  # do not delete!
+    last_time = new
+    return diff
 
 
 def fetch_text(text: str, font: pygame.font.Font):
@@ -36,7 +47,7 @@ def get_image(path: str, scale: Union[tuple[int, int], tuple[float, float]] = (1
     """Much faster implementation to fetch images because of my fetch text method
     Basically, whenever a texture is needed, it is fetched once before being stored in a dictionary for later use
     The path is relative to the current working directory, meaning C:/Users/susy.png wont be found even if there.
-    For example: a path of images/logo.png would actually start from the directory of the "__main__" python file"""
+    For example: a path of images/logo.png would actually start from the current working dir"""
     global images_storage
     path_thing = f"{path}|{scale}|{rot}"
     if not images_storage.__contains__(path_thing):

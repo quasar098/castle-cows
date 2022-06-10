@@ -1,6 +1,7 @@
 import pygame
 from typing import Union
-from yugo_tools import get_image, join, cserp, _move_pos, fetch_text, expand_rect
+# noinspection PyUnresolvedReferences
+from yugo_tools import get_image, join, cserp, _move_pos, fetch_text, expand_rect, debug_time
 from numpy import clip as clamp, log2
 from math import sqrt
 # noinspection PyUnresolvedReferences
@@ -72,10 +73,10 @@ class Hand:
     def draw(self, surface: pygame.Surface, framerate: int) -> None:
         padding_width = 200
         hand_rect = pygame.Rect(padding_width, surface.get_height()-300, surface.get_width()-padding_width*2, 300)
+        in_anim_sum = sum([cserp(self.in_anim.get(id(in_card), 0)) for in_card in self.cards])
         for count, card in enumerate(self.cards):
             self.anim[id(card)] = self.anim.get(id(card), 0)
             self.in_anim[id(card)] = self.in_anim.get(id(card), 0)
-            in_anim_sum = sum([cserp(self.in_anim.get(id(in_card), 0)) for in_card in self.cards])
             log_part = 1
             if not in_anim_sum == 0:
                 log_part = clamp(log2(in_anim_sum+1), 1, 18923)
@@ -83,10 +84,10 @@ class Hand:
                 log_part = 1
             x = surface.get_width()/2  # start at center
             x -= in_anim_sum*125/log_part  # offset to the left
-            x += count*250/log_part  # move to the right based on enum count
+            spacing = 250/log_part
+            x += count*spacing  # move to the right based on enum count
             y = surface.get_height()-180-(cserp(self.anim[id(card)])*145)
-            card_rect = pygame.Rect(x, y,
-                                    250/log_part+(250-250/log_part)*(int(len(self.cards)-1 == count)), 325)
+            card_rect = pygame.Rect(x, y, 250/log_part+(250-250/log_part)*(int(len(self.cards)-1 == count)), 325)
             if card_rect.collidepoint(pygame.mouse.get_pos()):
                 self.anim[id(card)] += 0.06*75/framerate
             else:
@@ -94,7 +95,10 @@ class Hand:
             self.anim[id(card)] = clamp(self.anim[id(card)], 0, 1)
             self.in_anim[id(card)] += 0.06*75/framerate
             self.in_anim[id(card)] = clamp(self.in_anim[id(card)], 0, 1)
-            surface.blit(get_image(join("images", "cards", card.image), (0.5, 0.5)), (x, y))
+            optimized_card = get_image(join("images", "cards", card.image), (0.5, 0.5))
+            if self.anim[id(card)] == 0 and len(self.cards) > 5 and count != len(self.cards)-1:  # crop the card for faster drawing
+                optimized_card = optimized_card.subsurface(pygame.Rect(0, 0, spacing+30, 325))
+            surface.blit(optimized_card, (x, y))
             if debug:
                 draw_border_of_rect(surface, card_rect)
                 draw_border_of_rect(surface, hand_rect, (255, 0, 0))
@@ -189,10 +193,9 @@ class Camera:
     def __init__(self, pos: tuple[int, int]):
         self.x = pos[0]
         self.y = pos[1]
-        self.zoom = 1
 
-    def __str__(self):
-        return f"Camera<({self.x}, {self.y})>"
+    def __repr__(self):
+        return f"<Camera({self.x}, {self.y})>"
 
 
 class Player:
@@ -200,10 +203,9 @@ class Player:
     def __init__(self, name: str):
 
         # important stuff
-        self.dollar: int = 25
-        self.milk: int = 25
-        self.hay: int = 25
-        # todo change these back when finished beta
+        self.dollar: int = 5
+        self.milk: int = 5
+        self.hay: int = 5
         self.username = name
         self.field: Field = Field()
         self.hand: Hand = Hand()
@@ -441,7 +443,7 @@ class Player:
                                 add_popup("You can't do that!")
             return True
 
-        # handling the drawing of cards
+        # handling the fake cards
         if len(self.drawing_fake_cards) > 0:
             fake_card = self.drawing_fake_cards[0]
             if fake_card.get_rect().collidepoint(pygame.mouse.get_pos()):
@@ -453,7 +455,11 @@ class Player:
                             self.hand.cards.append(fake_card.real_card)
                             self.drawing_fake_cards.remove(fake_card)
                             play_sound_path(join("sounds", "cardplay.mp3"), 0.5)
-
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_SPACE:  # draw instantly
+                    self.hand.cards.append(fake_card.real_card)
+                    self.drawing_fake_cards.remove(fake_card)
+                    play_sound_path(join("sounds", "cardplay.mp3"), 0.5)
             return True
 
         # grabbing a card from the hand
@@ -932,8 +938,12 @@ def execute_action(action: Union[Action, DelayedAction, InputAction]) -> None:
             if action.action == DO_SELF_DRAW_MANURE:
                 get_local_player().draw_card(action.amount, Manure)
             if action.action == DO_TAKE_TOP_DISCARD_CARD:
-                get_local_player().hand.cards.append(get_local_player().discard_pile[len(get_local_player().discard_pile)-1])
-                get_local_player().discard_pile.pop(len(get_local_player().discard_pile)-1)
+                if len(get_local_player().discard_pile) >= 1:
+                    revived = get_local_player().discard_pile[len(get_local_player().discard_pile)-1]
+                    revived.was_on_field = False
+                    revived.reset_abilities()
+                    get_local_player().hand.cards.append(revived)
+                    get_local_player().discard_pile.pop(len(get_local_player().discard_pile)-1)
 
         # non amount based things
         if action.action == DO_DISCARD_THIS_CARD:

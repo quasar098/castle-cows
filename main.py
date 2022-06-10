@@ -262,7 +262,6 @@ def draw_game():
             return RightClickAbility(
                 f"Ability: {ab.name}", ab, get_local_player().can_pay_for(ab.currency, ab.cost) * (1-ab.activated)
             )
-
     for ev in events:
         if ev.type == pygame.QUIT:
             stop_game()
@@ -561,7 +560,6 @@ while running:
 
     # primary pygame stuff
 
-    # todo: add camera scrolling
     black_intro_screen()
     draw_debug()
     update_popups(screen, FRAMERATE)

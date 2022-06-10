@@ -598,7 +598,7 @@ class Player:
                     camera_to_card(card)
                     add_popup("This land can't have any animals!")
                     return True
-                if len(card.get_residents()) > card.land_max_capacity:
+                if len([res for res in card.get_residents() if res.card_is_cow or not card.land_only_holds_cows]) > card.land_max_capacity:
                     camera_to_card(card)
                     add_popup("Too many animals on this land!")
                     return True
@@ -999,6 +999,7 @@ class Card:
         # inhabitant
         self.land_max_capacity = None
         self.land_buff_animal_multipliers = {}  # (ex: {Pig: 3} means pigs are buffed x3)
+        self.land_only_holds_cows = False
         # todo add land multipliers funmctionality
 
     def mod_x(self):
@@ -1060,7 +1061,7 @@ class Card:
         name[len(name)-1] = name[len(name)-1][:-4]
         return " ".join(name)
 
-    def get_residents(self, card=None, player: Player = None) -> list:
+    def get_residents(self, card=None, player: Player = None) -> list["Card"]:
         """Uses the local player if no player is specified"""
         def distance(p1: tuple[float, float], p2: tuple[float, float]) -> float: return sqrt(abs(p1[0]-p2[0])**2 + abs(p1[1]-p2[1])**2)
         if player is None:
@@ -1323,6 +1324,7 @@ class HomelessShelter(Card):
         self.cost_amount = 3
         self.cost_currency = DOLLAR
         self.land_max_capacity = 4
+        self.land_only_holds_cows = True
 
 
 class TraderCow(Card):

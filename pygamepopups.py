@@ -115,7 +115,7 @@ class RightClickMenu:  # there should only be one of these
         self.font: pygame.font.Font = pygame.font.SysFont("Arial", 20)
         self.shown = False
 
-    def show(self, options: list[RightClickOption, RightClickAbility] = ()):
+    def show(self, options: list[Union[RightClickOption, RightClickAbility]] = ()):
         if len(options) == 0:
             return
         self.shown = True

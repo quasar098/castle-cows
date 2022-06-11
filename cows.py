@@ -1003,7 +1003,7 @@ class Card:
 
         # other
         self.card_is_cow = False
-        self.card_buff_equipment_multipliers = {}  # same as land multipliers but buffs the card (all numbers)
+        self.card_buff_equipment_multipliers = {}  # same as land multipliers but buffs the equipment
         # todo add this
 
         # inhabitant

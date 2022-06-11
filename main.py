@@ -558,8 +558,7 @@ while running:
     elif viewing_screen == DECK_BUILDER_SCREEN:
         draw_deck_builder()
 
-    # primary pygame stuff
-
+    # update stuff
     black_intro_screen()
     draw_debug()
     update_popups(screen, FRAMERATE)

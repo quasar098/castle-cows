@@ -1,3 +1,5 @@
+from pygame import Color
+
 # game events (G ame E vents) (causation) (also for delayed actions)
 GE_SELF_TURN_START = 100
 GE_ANY_TURN_START = 101
@@ -60,3 +62,8 @@ GAME_SCREEN = -10
 LOBBY_SCREEN = -11
 MAIN_MENU_SCREEN = -12
 DECK_BUILDER_SCREEN = -13
+
+# colors
+BG_COLOR = Color(169, 228, 239)
+DARK_BG_COLOR = Color(165, 210, 234)
+MAIN_COLOR = Color(129, 244, 149)

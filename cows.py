@@ -249,7 +249,6 @@ class Player:
         box_width = 40
         box_height = 90
         text_height_from_top = 60
-        border_rounding = 2
         spacing_x = 18
         box_height_from_top = 7
 
@@ -258,7 +257,8 @@ class Player:
 
         # money border
         money_rectangle = pygame.Rect(player_info_rect.left, player_info_rect.top, box_width, box_height)
-        pygame.draw.rect(surface, (0, 0, 0), expand_rect(money_rectangle, 4), border_radius=border_rounding)
+        pygame.draw.rect(surface, (77, 77, 77), expand_rect(money_rectangle, 4).move(0, 4))
+        pygame.draw.rect(surface, (0, 0, 0), expand_rect(money_rectangle, 4))
         money_surf = pygame.Surface(money_rectangle.size)
         money_surf.fill((94, 252, 141))
         surface.blit(money_surf, money_rectangle.topleft)
@@ -271,7 +271,8 @@ class Player:
 
         # milk border
         milk_rectangle = pygame.Rect(player_info_rect.left+40+spacing_x, player_info_rect.top, box_width, box_height)
-        pygame.draw.rect(surface, (0, 0, 0), expand_rect(milk_rectangle, 4), border_radius=border_rounding)
+        pygame.draw.rect(surface, (77, 77, 77), expand_rect(milk_rectangle, 4).move(0, 4))
+        pygame.draw.rect(surface, (0, 0, 0), expand_rect(milk_rectangle, 4))
         milk_surf = pygame.Surface(milk_rectangle.size)
         milk_surf.fill((163, 247, 255))
         surface.blit(milk_surf, milk_rectangle.topleft)
@@ -283,7 +284,8 @@ class Player:
 
         # hay border
         hay_rectangle = pygame.Rect(player_info_rect.left+(40+spacing_x)*2, player_info_rect.top, box_width, box_height)
-        pygame.draw.rect(surface, (0, 0, 0), expand_rect(hay_rectangle, 4), border_radius=border_rounding)
+        pygame.draw.rect(surface, (77, 77, 77), expand_rect(hay_rectangle, 4).move(0, 4))
+        pygame.draw.rect(surface, (0, 0, 0), expand_rect(hay_rectangle, 4))
         hay_surf = pygame.Surface(hay_rectangle.size)
         hay_surf.fill((245, 230, 99))
         surface.blit(hay_surf, hay_rectangle.topleft)

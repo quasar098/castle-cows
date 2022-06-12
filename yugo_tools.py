@@ -44,10 +44,9 @@ def set_yugo_framerate(amount: int) -> int:
 
 
 def get_image(path: str, scale: Union[tuple[int, int], tuple[float, float]] = (1, 1), rot: float = 0):
-    """Much faster implementation to fetch images because of my fetch text method
-    Basically, whenever a texture is needed, it is fetched once before being stored in a dictionary for later use
-    The path is relative to the current working directory, meaning C:/Users/susy.png wont be found even if there.
-    For example: a path of images/logo.png would actually start from the current working dir"""
+    """NOTE: PATH IS RELATIVE TO THE CURRENT WORKING DIR
+    GOOD: images/backside.png
+    BAD: /home/johndoe/yayayaydaadad/castle-cows-online/amogus/images/backside.png"""
     global images_storage
     path_thing = f"{path}|{scale}|{rot}"
     if not images_storage.__contains__(path_thing):
@@ -136,21 +135,22 @@ class Button(Text):
         self.color = pygame.Color(color)
         self.pressed_color = pygame.Color(pressed_color) if pressed_color is not None else None
         self.secondary_color = pygame.Color(secondary_color)
-        self.action = action
+        self.action = action if action is not None else lambda: None
         self.action_args = action_args
         self.pressed = False
         """Text with a button that is clickable to trigger a function
         The text alignment is always centered"""
 
     def draw(self, surface: pygame.Surface) -> None:
-        pygame.draw.rect(surface, self.secondary_color, expand_rect(self.rect, 4), border_radius=2)
+        pygame.draw.rect(surface, self.secondary_color.lerp((255, 255, 255), 0.3), expand_rect(self.rect, 4).move(0, 4))
+        pygame.draw.rect(surface, self.secondary_color, expand_rect(self.rect, 4).move(0, int(self.pressed)*2))
         inside_color = self.color.lerp((0, 0, 0), int(self.pressed)*0.1)
         if self.pressed_color is not None:
             inside_color = self.pressed_color if self.pressed else self.color
         pygame.draw.rect(surface, inside_color,
-                         self.rect.move(int(self.pressed), int(self.pressed)), border_radius=2)
+                         self.rect.move(0, int(self.pressed)*2))
         surface.blit(self.text_surface,
-                     self.text_surface.get_rect(center=self.rect.center).move(int(self.pressed), int(self.pressed)))
+                     self.text_surface.get_rect(center=self.rect.center).move(0, int(self.pressed)*2))
 
     def change(self, font: pygame.font.Font = None, action: Union[Callable, None] = "NoParam",
                text: Any = None, color: Union[tuple[int, int, int], pygame.Color] = None,
@@ -358,7 +358,8 @@ class InputBox:
                  allowed_chars: Union[str, list[str]] = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ/()" +
                                                         "_=-1234567890#$%^&*!?,.<>;':'\"\\|[]{}`~ ",
                  color: Union[tuple[int, int, int], pygame.Color] = (255, 255, 255),
-                 text_if_no_text: str = "Enter this"):
+                 text_if_no_text: str = "Enter this",
+                 max_len=2000):
         self.text_if_no_text = text_if_no_text
         self.rect = pygame.Rect(rect)
         self.font = font
@@ -369,6 +370,7 @@ class InputBox:
         self.text_if_no_text_surf = font.render(text_if_no_text, True,
                                                 pygame.Color((149, 150, 157)).lerp(self.color, 0.4))
         self.text = ""
+        self.max_len = max_len
         self.text_surf = pygame.Surface((1, 1))
         self.text_surf.fill(self.color)
         self.selected = False
@@ -407,11 +409,12 @@ class InputBox:
             self.text_if_no_text = text_if_no_text
 
     def draw(self, surface: pygame.Surface) -> None:
-        pygame.draw.rect(surface, (0, 0, 0), expand_rect(self.rect, 6), border_radius=6)
-        pygame.draw.rect(surface, self.color, self.rect, border_radius=4)
+        pygame.draw.rect(surface, (77, 77, 77), expand_rect(self.rect, 4).move(0, 4))
+        pygame.draw.rect(surface, (0, 0, 0), expand_rect(self.rect, 4))
+        pygame.draw.rect(surface, self.color, self.rect)
         if self.rect.collidepoint(pygame.mouse.get_pos()):
-            pygame.draw.rect(surface, pygame.Color((149, 150, 157)).lerp(self.color, 0.6), self.rect, border_radius=4)
-            pygame.draw.rect(surface, self.color, expand_rect(self.rect, -7), border_radius=4)
+            pygame.draw.rect(surface, pygame.Color((149, 150, 157)).lerp(self.color, 0.6), self.rect)
+            pygame.draw.rect(surface, self.color, expand_rect(self.rect, -7))
         if len(self.text) == 0 and not self.selected:
             surface.blit(self.text_if_no_text_surf,
                          self.text_if_no_text_surf.get_rect(midleft=_move_pos(self.rect.midleft, (10, 0))))
@@ -443,8 +446,9 @@ class InputBox:
         if event.type == pygame.TEXTINPUT:
             if self.selected:
                 if event.text in self.allowed:
-                    self.text += event.text
-                    self.redraw_surface()
+                    if len(self.text) < self.max_len:
+                        self.text += event.text
+                        self.redraw_surface()
                 self.time_since_last_clicked = 0
                 return True
         if event.type == pygame.KEYDOWN:

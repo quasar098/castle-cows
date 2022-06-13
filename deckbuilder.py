@@ -1,7 +1,7 @@
 from settingshandler import SettingsHandler
 from cows import *
 import pygame
-from yugo_tools import Button, InputBox
+from yugo_tools import Button, InputBox, MultipleChoice
 from typing import Any
 
 
@@ -37,12 +37,92 @@ class Deck:
         self.loot_pool[card_class] += 1
 
     def remove_card(self, card_class):
-        self.loot_pool[card_class] -= 1
-        if not self.loot_pool.get(card_class):
-            self.loot_pool.pop(card_class)
+        if card_class in self.loot_pool:
+            self.loot_pool[card_class] -= 1
+            if not self.loot_pool.get(card_class):
+                self.loot_pool.pop(card_class)
 
 
 DEFAULT_DECK = Deck("Default Deck")
+
+
+class CardSelector:
+    def __init__(self, rect: pygame.Rect):
+        self.scroll = 0
+        self.dscroll = 0
+        self.rect = rect
+        self.prev_mouse_pos = (0, 0)
+        self._possible_cards = Card.__subclasses__()
+        self._possible_cards.sort(key=lambda _: _.image)
+        self.scroll_speed = 8
+        self.search_term = ""
+        self.type_filter = None
+
+    @property
+    def possible_cards(self) -> list:
+        # search
+        filtered = list(filter(lambda _: self.search_term in _.get_name(_).lower(), self._possible_cards))
+        # type
+        if self.type_filter is not None:
+            filtered = list(filter(lambda _: _.type == self.type_filter, self._possible_cards))
+        # return it
+        if not len(filtered):
+            filtered = self._possible_cards
+        return filtered
+
+    @property
+    def selected(self):
+        return bool(self.rect.collidepoint(pygame.mouse.get_pos())*pygame.mouse.get_pressed(3)[0])
+
+    def showcase_card(self, off=0):
+        return self.possible_cards[clamp(int(divmod(self.scroll-off, len(self.possible_cards))[1]), 0, len(self.possible_cards)-1)]
+
+    @property
+    def rel_mouse(self):
+        mloc = pygame.mouse.get_pos()
+        return mloc[0]-self.prev_mouse_pos[0], mloc[1]-self.prev_mouse_pos[1]
+
+    def draw(self, screen: pygame.Surface, font):
+        if self.selected:
+            self.dscroll = self.scroll_speed*self.rel_mouse[0]/self.rect.w
+        self.scroll += self.dscroll
+        if self.dscroll.__abs__() > 30:
+            self.dscroll = self.dscroll/self.dscroll.__abs__()*20
+            add_popup("Stop scrolling so fast!")
+        self.dscroll *= 0.8
+
+        ratio = self.rect.w/500/3
+        lefter_showcase = get_image(join("images", "cards", self.showcase_card(-2).image), (ratio, ratio))
+        screen.blit(lefter_showcase, lefter_showcase.get_rect(
+            midtop=self.rect.move(divmod(self.scroll, 1)[1]*self.rect.w/3-ratio*1250, 10).midtop)
+                    )
+        righter_showcase = get_image(join("images", "cards", self.showcase_card(2).image), (ratio, ratio))
+        screen.blit(righter_showcase, righter_showcase.get_rect(
+            midtop=self.rect.move(divmod(self.scroll, 1)[1]*self.rect.w/3+ratio*750, 10).midtop)
+                    )
+        left_showcase = get_image(join("images", "cards", self.showcase_card(-1).image), (ratio, ratio))
+        screen.blit(left_showcase, left_showcase.get_rect(
+            midtop=self.rect.move(divmod(self.scroll, 1)[1]*self.rect.w/3-ratio*750, 10).midtop)
+                    )
+        right_showcase = get_image(join("images", "cards", self.showcase_card(1).image), (ratio, ratio))
+        screen.blit(right_showcase, right_showcase.get_rect(
+            midtop=self.rect.move(divmod(self.scroll, 1)[1]*self.rect.w/3+ratio*250, 10).midtop)
+                    )
+        middle_showcase = get_image(join("images", "cards", self.showcase_card(0).image), (ratio*1.1, ratio*1.1))
+        screen.blit(middle_showcase, middle_showcase.get_rect(
+            midtop=self.rect.move(divmod(self.scroll, 1)[1]*self.rect.w/3-ratio*250, 10-23).midtop)
+                    )
+        arrow = self.rect.centerx, self.rect.bottom-50
+        pygame.draw.polygon(screen, (0, 0, 0), (arrow, (arrow[0]-20, arrow[1]+40), (arrow[0]+20, arrow[1]+40)))
+
+        # set prev pos
+        self.prev_mouse_pos = pygame.mouse.get_pos()
+        if get_debug():
+            draw_border_of_rect(screen, self.rect, (255, 0, 0))
+            screen.blit(fetch_text(f"scroll: {self.scroll}", font, (255, 255, 255)), self.rect.topleft)
+            screen.blit(
+                fetch_text(f"select: {self.showcase_card().get_name(self.showcase_card())}", font, (255, 255, 255)), self.rect.bottomleft
+            )
 
 
 class DeckBuilder:
@@ -55,13 +135,20 @@ class DeckBuilder:
             self.decks.append(DEFAULT_DECK)
         self.selected_deck_id = id(self.decks[0])
 
-        # deck select screen stuff
+        # deck select
+        # screen stuff
         width, height, = pygame.display.get_window_size()
         self.font = font
         self.small_font = small_font
         self.left_section_rect = pygame.Rect(0, 0, 300, height)
         self.middle_section_rect = pygame.Rect(300, 0, 500, height)
         self.right_section_rect = pygame.Rect(800, 0, width-self.left_section_rect.w-self.middle_section_rect.w, height)
+        self.card_selector = CardSelector(self.right_section_rect.inflate(-20, -450).move(0, -70))
+        self.card_selector.rect.h -= 50
+        self.right_info_rect = self.right_section_rect.copy()
+        self.right_info_rect.y = self.card_selector.rect.bottom
+        self.right_info_rect.h = height-self.card_selector.rect.bottom
+        self.right_info_rect = self.right_info_rect.inflate(-20, -20)
 
         # buttons
         self.change_deck_name = InputBox(
@@ -90,6 +177,35 @@ class DeckBuilder:
             self.copy_sel_deck,
             text="Copy Deck",
         )
+        self.include_card_button = Button(
+            (self.right_info_rect.left, self.right_info_rect.top+50, self.right_info_rect.w/2-5, 60),
+            self.font,
+            self.add_sel_card,
+            text="Add card"
+        )
+        self.remove_card_button = Button(
+            (self.right_info_rect.left+self.right_info_rect.w/2+10, self.right_info_rect.top+50, self.right_info_rect.w/2-5, 60),
+            self.font,
+            self.remove_sel_card,
+            text="Remove card"
+        )
+        self.search_box = InputBox(
+            pygame.Rect(self.right_info_rect.left, self.right_info_rect.top, self.right_info_rect.w/2-5, 40),
+            self.font,
+            text_if_no_text="search for card",
+            max_len=30
+        )
+        self.filter_by_type = MultipleChoice(
+            self.search_box.rect.move(self.right_info_rect.w/2+10, 0),
+            self.font,
+            ["All cards", "Incantations", "Animals", "Lands", "Talismans", "Equipments"]
+        )
+
+    def add_sel_card(self):
+        self.selected_deck.add_card(self.card_selector.showcase_card())
+
+    def remove_sel_card(self):
+        self.selected_deck.remove_card(self.card_selector.showcase_card())
 
     def reload_from_disk(self):
         self.decks = self.settings_handler.get_state("decks")
@@ -137,7 +253,31 @@ class DeckBuilder:
         def move_pos(p, of):
             return p[0]+of[0], p[1]+of[1]
 
+        self.card_selector.draw(screen, self.font)
         width, height, = pygame.display.get_window_size()
+        # right section
+        screen.fill(BG_COLOR, self.middle_section_rect)
+        screen.fill(BG_COLOR, self.left_section_rect)
+        if self.change_deck_name.text != self.selected_deck.name:
+            self.change_deck_name.change(text=self.selected_deck.name, font=self.font)
+        screen.blit(fetch_text(
+            f"Card name: {self.card_selector.showcase_card().get_name(self.card_selector.showcase_card())}", self.font
+        ), self.right_info_rect.move(0, 130))
+        screen.blit(fetch_text(
+            f"Card type: {self.card_selector.showcase_card().repr_type_of_card(self.card_selector.showcase_card())}", self.font
+        ), self.right_info_rect.move(0, 160))
+
+        # draw ui
+        self.delete_deck_button.draw(screen)
+        self.add_deck_button.draw(screen)
+        self.change_deck_name.draw(screen)
+        self.copy_deck_button.draw(screen)
+        self.include_card_button.draw(screen)
+        self.remove_card_button.draw(screen)
+        self.search_box.draw(screen)
+        self.filter_by_type.draw(screen)
+        self.filter_by_type.draw_select(screen)
+
         # two lines for seperation
         pygame.draw.aaline(
             screen, (60, 60, 60),
@@ -189,14 +329,9 @@ class DeckBuilder:
             pygame.draw.rect(screen, (255, 255, 255), sub_less_rect)
             sub_text = fetch_text("-", self.small_font)
             screen.blit(sub_text, sub_text.get_rect(center=sub_less_rect.center))
-
-        # right section
-        if self.change_deck_name.text != self.selected_deck.name:
-            self.change_deck_name.change(text=self.selected_deck.name, font=self.font)
-        self.delete_deck_button.draw(screen)
-        self.add_deck_button.draw(screen)
-        self.change_deck_name.draw(screen)
-        self.copy_deck_button.draw(screen)
+        if get_debug():
+            draw_border_of_rect(screen, self.right_info_rect, (0, 255, 255))
+        draw_cows_popups(screen, FRAMERATE)
 
     def handle_events(self, event: pygame.event.Event):
         width, height, = pygame.display.get_window_size()
@@ -227,12 +362,29 @@ class DeckBuilder:
                         self.selected_deck.remove_card(card)
                         break
 
+        # ui elements
         if self.change_deck_name.handle_events(event):
             self.selected_deck.name = self.change_deck_name.text
+            return True
+        if self.filter_by_type.handle_events(event):
+            self.card_selector.type_filter = {
+                "Animals": TYPE_ANIMAL,
+                "Incantations": TYPE_INCANTATION,
+                "Lands": TYPE_LAND,
+                "Equipments": TYPE_EQUIPMENT,
+                "Talismans": TYPE_TALISMAN
+            }.get(self.filter_by_type.selected_option)
             return True
         if self.add_deck_button.handle_events(event):
             return True
         if self.delete_deck_button.handle_events(event):
             return True
         if self.copy_deck_button.handle_events(event):
+            return True
+        if self.include_card_button.handle_events(event):
+            return True
+        if self.remove_card_button.handle_events(event):
+            return True
+        if self.search_box.handle_events(event):
+            self.card_selector.search_term = self.search_box.text
             return True

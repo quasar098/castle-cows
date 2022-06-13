@@ -6,13 +6,6 @@ from packets import *
 from cows import *
 import pygame
 from deckbuilder import DeckBuilder
-# noinspection PyBroadException
-try:
-    # noinspection PyPackageRequirements
-    from win32api import EnumDisplayDevices, EnumDisplaySettings
-    FRAMERATE = EnumDisplaySettings(EnumDisplayDevices().DeviceName, -1).DisplayFrequency
-except Exception:  # for whatever reason, if cannot find it or error with the module
-    FRAMERATE = 60
 pygame.init()
 
 # pygame variables

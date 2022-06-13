@@ -1014,6 +1014,16 @@ class Card:
         self.land_only_holds_cows = False
         # todo add land multipliers funmctionality
 
+    @staticmethod
+    def repr_type_of_card(card):
+        return {
+            TYPE_ANIMAL: "Animal",
+            TYPE_TALISMAN: "Talisman",
+            TYPE_INCANTATION: "Incantation",
+            TYPE_EQUIPMENT: "Equipment",
+            TYPE_LAND: "Land"
+        }.get(card.type, "UNKNOWN")
+
     def mod_x(self):
         return self.x-get_local_player().camera.x
 

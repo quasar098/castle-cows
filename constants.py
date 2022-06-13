@@ -1,4 +1,11 @@
 from pygame import Color
+# noinspection PyBroadException
+try:
+    # noinspection PyPackageRequirements
+    from win32api import EnumDisplayDevices, EnumDisplaySettings
+    FRAMERATE = EnumDisplaySettings(EnumDisplayDevices().DeviceName, -1).DisplayFrequency
+except Exception:  # for whatever reason, if cannot find it or error with the module
+    FRAMERATE = 60
 
 # game events (G ame E vents) (causation) (also for delayed actions)
 GE_SELF_TURN_START = 100

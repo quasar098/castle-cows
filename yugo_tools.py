@@ -23,9 +23,9 @@ def debug_time(name):
     return diff
 
 
-def fetch_text(text: str, font: pygame.font.Font):
+def fetch_text(text: str, font: pygame.font.Font, color=(0, 0, 0)):
     if not texts_storage.__contains__(text):
-        texts_storage[text] = font.render(text, True, (0, 0, 0))
+        texts_storage[text] = font.render(text, True, color)
     return texts_storage[text]
 
 
@@ -312,20 +312,21 @@ class MultipleChoice:
 
     def draw(self, surface: pygame.Surface) -> None:
         secondary_color = pygame.Color(0, 0, 0)
-        pygame.draw.rect(surface, secondary_color, expand_rect(self.rect, 6), border_radius=6)
-        pygame.draw.rect(surface, self.color, self.rect, border_radius=4)
+        pygame.draw.rect(surface, secondary_color.lerp((255, 255, 255), 0.3), expand_rect(self.rect, 4).move(0, 4))
+        pygame.draw.rect(surface, secondary_color, expand_rect(self.rect, 4))
+        pygame.draw.rect(surface, self.color, self.rect)
         surface.blit(self.options[self.selected_option],
                      self.options[self.selected_option].get_rect(midleft=(self.rect.left+9, self.rect.centery)))
         arrow_head = _move_pos(self.rect.midright, (-self.rect.h/2, 5))
-        pygame.draw.line(surface, secondary_color, arrow_head, _move_pos(arrow_head, (-10, -10)), 4)
-        pygame.draw.line(surface, secondary_color, arrow_head, _move_pos(arrow_head, (10, -10)), 4)
+        pygame.draw.line(surface, secondary_color, arrow_head, _move_pos(arrow_head, (-5, -10)), 4)
+        pygame.draw.line(surface, secondary_color, arrow_head, _move_pos(arrow_head, (5, -10)), 4)
 
     def draw_select(self, surface: pygame.Surface) -> None:
         if self.selecting_option:
             options_rect = pygame.Rect(self.rect.x, self.rect.y,
                                        self.rect.w, (self.font.get_height()+4)*len(self.options)+8)
-            pygame.draw.rect(surface, (0, 0, 0), expand_rect(options_rect, -4), border_radius=3)
-            pygame.draw.rect(surface, self.color, expand_rect(options_rect, -8), border_radius=2)
+            pygame.draw.rect(surface, (0, 0, 0), options_rect)
+            pygame.draw.rect(surface, self.color, expand_rect(options_rect, -4))
             for count, option in enumerate(self.options):
                 option_rect = pygame.Rect(self.rect.x+4, self.rect.y+(self.font.get_height()+4)*count+4,
                                           self.rect.w-8, self.options[option].get_rect().h+4)
@@ -375,6 +376,8 @@ class InputBox:
         self.text_surf.fill(self.color)
         self.selected = False
         self.time_since_last_clicked = 0
+        self.backspace_pressed = False
+        self.backspace_timer = 0
 
     def redraw_surface(self) -> None:
         self.text_surf = self.font.render(self.text, True, (0, 0, 0))
@@ -409,6 +412,15 @@ class InputBox:
             self.text_if_no_text = text_if_no_text
 
     def draw(self, surface: pygame.Surface) -> None:
+        if self.backspace_pressed:
+            self.backspace_timer += 1
+        else:
+            self.backspace_timer = 0
+        if self.backspace_timer > 30:
+            self.backspace_timer = 27
+            self.text = self.text[:-1]
+            self.redraw_surface()
+            self.time_since_last_clicked = 0
         pygame.draw.rect(surface, (77, 77, 77), expand_rect(self.rect, 4).move(0, 4))
         pygame.draw.rect(surface, (0, 0, 0), expand_rect(self.rect, 4))
         pygame.draw.rect(surface, self.color, self.rect)
@@ -454,10 +466,15 @@ class InputBox:
         if event.type == pygame.KEYDOWN:
             if self.selected:
                 if event.key == pygame.K_BACKSPACE:
+                    self.backspace_pressed = True
                     self.text = self.text[:-1]
                     self.redraw_surface()
                 self.time_since_last_clicked = 0
                 return True
+        if event.type == pygame.KEYUP:
+            if self.selected:
+                if event.key == pygame.K_BACKSPACE:
+                    self.backspace_pressed = False
         if event.type == pygame.WINDOWLEAVE:
             self.selected = False
         return False

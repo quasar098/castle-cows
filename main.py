@@ -45,6 +45,12 @@ deck_builder.inject_deck(deck_builder.decks[0], get_local_player())
 def set_screen(scr: int):
     global viewing_screen
     viewing_screen = scr
+    if viewing_screen == GAME_SCREEN:
+        if not get_local_player().has_drawn_starting:
+            get_local_player().has_drawn_starting = True
+            get_local_player().draw_starting_hand()
+    if viewing_screen == DECK_BUILDER_SCREEN:
+        deck_builder.inject_deck(deck_builder.selected_deck, get_local_player())
     play_sound(calming_ding_sound, 0.4)
 
 
@@ -127,11 +133,6 @@ calming_ding_sound = pygame.mixer.Sound(join(getcwd(), "sounds", "ding.mp3"))
 def stop_game():
     global running
     running = False
-
-
-def change_screen(change_to: int):
-    global viewing_screen
-    viewing_screen = change_to
 
 
 def draw_debug():
@@ -303,6 +304,7 @@ def draw_deck_builder():
             if event.key == pygame.K_ESCAPE:
                 set_screen(MAIN_MENU_SCREEN)
                 deck_builder.save_to_disk()
+                deck_builder.inject_deck(deck_builder.selected_deck, get_local_player())
 
         deck_builder.handle_events(event)
     deck_builder.draw(screen)
@@ -325,7 +327,6 @@ def relocate_mouse_events():
         events.insert(0, hit_target)
 
 
-get_local_player().draw_starting_hand()
 running = True
 while running:
     screen.fill(BG_COLOR)
@@ -338,11 +339,11 @@ while running:
     if tick/FRAMERATE < 0.2:
         events = []
 
-    window_buttons(True)
-
     # game menu
     if viewing_screen == GAME_SCREEN:
         draw_game()
+
+    window_buttons(True)
 
     # main menu
     if viewing_screen == MAIN_MENU_SCREEN:

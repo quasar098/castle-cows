@@ -11,7 +11,7 @@ from effects import CurrencyParticle, CircleParticle, play_sound_path, FakeCard
 from constants import *
 # noinspection PyUnresolvedReferences
 from cowspopups import add_popup, draw_cows_popups, handle_cows_popups, add_debug_popup
-from random import choices as randchoice
+from random import choices as randchoice, random
 
 
 class Action:
@@ -23,11 +23,10 @@ class Action:
 
 
 class InputAction:
-    def __init__(self, card, action: int, amount: int, what_choose: int, conditional=None):
+    def __init__(self, card, what_choose: int, amount: int, conditional=None):
         self.card: Card = card
-        self.action = action
-        self.amount = amount
         self.choose = what_choose
+        self.amount = amount
         self.conditional: Union[ActionConditional, None] = conditional
 
 
@@ -42,7 +41,7 @@ class DelayedAction:
 
 class ActionConditional:
     def __init__(self, card, requirement, comparison_type, amount):
-        """Its requirement comparison type amount (e.g. 2 > 3),
+        """Its self, then requirement, then comparison, then amount (e.g. 2 > 3),
         so more than means that requirement > amount
         """
         self.card = card
@@ -54,6 +53,10 @@ class ActionConditional:
         amount1 = 0
         if self.req == REQ_CARD_NUM_RESIDENTS:
             amount1 = self.card.get_num_residents()
+        if self.req == REQ_LAND_AMOUNT:
+            amount1 = len(list(filter(lambda card: card.type == TYPE_LAND, get_local_player().get_cards_recursively())))
+        if self.req == REQ_TURNS_PASSED:
+            amount1 = get_statistics_manager().turns_passed
         amount2 = self.amount
         if self.comp == COND_OPERATOR_MORE_THAN:
             return amount1 > amount2
@@ -231,6 +234,7 @@ class Player:
 
         # misc
         self.loot_pool = {}
+        self.has_drawn_starting = False
         self.index_of_grab = 0
 
     def update_visible_currencies(self):
@@ -923,6 +927,8 @@ def execute_action(action: Union[Action, DelayedAction, InputAction]) -> None:
                 if isinstance(action.card, mul_class):
                     multiplier *= _s[mul_class]
         for _ in range(amount*multiplier):
+            if action.action == DO_SELF_DRAW_CARD:
+                get_local_player().draw_card(action.amount)
             if action.action == DO_SELF_GIVE_DOLLAR:
                 get_local_player().dollar += 1
                 currency_particles.append(CurrencyParticle(particle_pos, DOLLAR))
@@ -946,6 +952,14 @@ def execute_action(action: Union[Action, DelayedAction, InputAction]) -> None:
                     revived.reset_abilities()
                     get_local_player().hand.cards.append(revived)
                     get_local_player().discard_pile.pop(len(get_local_player().discard_pile)-1)
+        if action.action == DO_TAKE_ALL_DISCARD_CARDS:
+            outcome = random() < action.amount/100
+            if outcome:
+                for card in get_local_player().discard_pile:
+                    card.was_on_field = False
+                    card.reset_abilities()
+                    get_local_player().hand.cards.append(card)
+                get_local_player().discard_pile = []
 
         # non amount based things
         if action.action == DO_DISCARD_THIS_CARD:
@@ -1503,7 +1517,7 @@ class Necromancy(Card):
         super().__init__(pos)
         self.cost_amount = 0
         self.cost_currency = DOLLAR
-        self.abilities = [Ability(Action(self, DO_TAKE_TOP_DISCARD_CARD, 1), 0, DOLLAR)]
+        self.abilities = [Ability(Action(self, DO_TAKE_ALL_DISCARD_CARDS, 10), 0, DOLLAR)]
 
 
 class UnstoppableMomentum(Card):
@@ -1518,3 +1532,40 @@ class UnstoppableMomentum(Card):
     def handle_action(self, action: int) -> Union[None, list[Action, DelayedAction, InputAction]]:
         if action == GE_SELF_PLAY_CARD:
             return [Action(self, DO_SELF_GIVE_HAY, 2)]
+
+
+class CustomInstallation(Card):
+    image = "custom_installation.png"
+    type = TYPE_TALISMAN
+
+    def __init__(self, pos: Union[list[int], tuple[int, int]] = (100, 100)):
+        super().__init__(pos)
+        self.cost_amount = 0
+        self.cost_currency = HAY
+        self.abilities = [Ability(
+            Action(
+                self,
+                DO_SELF_DRAW_CARD,
+                1,
+                ActionConditional(self, REQ_LAND_AMOUNT, COND_OPERATOR_LESS_THAN, 3)
+                   ),
+            5,
+            DOLLAR,
+            ab_name="DLL replacement"
+        )]
+
+
+class DevilsContract(Card):
+    image = "devils_contract.png"
+    type = TYPE_TALISMAN
+
+    def __init__(self, pos: Union[list[int], tuple[int, int]] = (100, 100)):
+        super().__init__(pos)
+        self.cost_amount = 0
+        self.cost_currency = HAY
+
+    def handle_action(self, action: int) -> Union[None, list[Action, DelayedAction, InputAction]]:
+        if action == GE_SELF_TURN_START:
+            if get_statistics_manager().turns_passed < 6:
+                return [Action(self, DO_SELF_GIVE_DOLLAR, 4)]
+        return None

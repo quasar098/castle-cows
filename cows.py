@@ -501,6 +501,7 @@ class Player:
                                 self.field.cards.remove(card_field)
                                 self.hand.cards.insert(self.index_of_grab, card_field)
                                 add_popup("You don't have enough wealth")
+                                play_sound_path(join("sounds", "error.mp3"))
                                 return True
                             if card_field.type == TYPE_INCANTATION:
                                 for ability in card_field.abilities:
@@ -553,9 +554,13 @@ class Player:
                         if self.field.cards.__contains__(card_find):  # assert is not null
                             good_types = (card_find.equipment_can_go_on if isinstance(card_find.equipment_can_go_on, tuple) else (card_find.equipment_can_go_on,))
                             if good_types.__contains__(card.type):
-                                if card_find.equipment_is_cow_exclusive:
-                                    if not card.card_is_cow:
+                                # equipment cow exclusive check
+                                if not card.card_is_cow:
+                                    if card_find.equipment_is_cow_exclusive:
                                         continue
+                                    else:
+                                        add_popup("This is cow exclusive!")
+                                # do the deed
                                 self.field.cards.remove(card_find)
                                 card.equipped.append(card_find)
                                 return True
@@ -929,6 +934,11 @@ def execute_action(action: Union[Action, DelayedAction, InputAction]) -> None:
         for _ in range(amount*multiplier):
             if action.action == DO_SELF_DRAW_CARD:
                 get_local_player().draw_card(action.amount)
+            if action.action == DO_RECOLLECT_INHABITANTS:
+                for card in get_local_player().get_cards_recursively(action.card.get_residents()):
+                    card.handle_action(GE_SELF_TURN_START)
+            if action.action == DO_SELF_DUPLICATE_CARD:
+                get_local_player().hand.cards.append(type(get_parent(action.card))())
             if action.action == DO_SELF_GIVE_DOLLAR:
                 get_local_player().dollar += 1
                 currency_particles.append(CurrencyParticle(particle_pos, DOLLAR))
@@ -1569,3 +1579,79 @@ class DevilsContract(Card):
             if get_statistics_manager().turns_passed < 6:
                 return [Action(self, DO_SELF_GIVE_DOLLAR, 4)]
         return None
+
+
+class LocalSupermarket(Card):
+    image = "local_supermarket.png"
+    type = TYPE_LAND
+
+    def __init__(self, pos: Union[list[int], tuple[int, int]] = (100, 100)):
+        super().__init__(pos)
+        self.cost_amount = 3
+        self.cost_currency = DOLLAR
+        self.land_max_capacity = 1
+        self.abilities = [Ability(Action(self, DO_SELF_GIVE_DOLLAR, 2), 10, MILK, ab_name="Milk Trade"),
+                          Ability(Action(self, DO_SELF_GIVE_HAY, 2), 15, MILK, ab_name="Hay Days")]
+
+
+class BigLamb(Card):
+    image = "big_lamb.png"
+    type = TYPE_ANIMAL
+
+    def __init__(self, pos: Union[list[int], tuple[int, int]] = (100, 100)):
+        super().__init__(pos)
+        self.cost_amount = 6
+        self.cost_currency = MILK
+        self.abilities = [Ability(Action(self, DO_SELF_GIVE_DOLLAR, 2), 1, DOLLAR, ab_name="Thug Life")]
+
+
+class InternationalTransfer(Card):
+    image = "international_transfer.png"
+    type = TYPE_EQUIPMENT
+
+    def __init__(self, pos: Union[list[int], tuple[int, int]] = (100, 100)):
+        super().__init__(pos)
+        self.cost_amount = 8
+        self.cost_currency = HAY
+        self.equipment_is_cow_exclusive = True
+        self.abilities = [Ability(Action(self, DO_SELF_DUPLICATE_CARD, 1), 8, HAY, ab_name="Fair Exchange")]
+
+
+class Mud(Card):
+    image = "mud.png"
+    type = TYPE_LAND
+
+    def __init__(self, pos: Union[list[int], tuple[int, int]] = (100, 100)):
+        super().__init__(pos)
+        self.cost_amount = 5
+        self.cost_currency = HAY
+        self.land_buff_animal_multipliers = {Pig: 2}
+        self.land_max_capacity = 2
+
+
+class KnightCow(Card):
+    image = "knight_cow.png"
+    type = TYPE_ANIMAL
+
+    def __init__(self, pos: Union[list[int], tuple[int, int]] = (100, 100)):
+        super().__init__(pos)
+        self.cost_amount = 3
+        self.cost_currency = HAY
+
+    def handle_action(self, action: int) -> Union[None, list[Action, DelayedAction, InputAction]]:
+        if action == GE_ANY_DRAW_CARD:
+            # todo implement this
+            return [Action(self, DO_SELF_DRAW_CARD, 1)]
+        return None
+
+
+class BlackMarket(Card):
+    image = "black_market.png"
+    type = TYPE_LAND
+
+    def __init__(self, pos: Union[list[int], tuple[int, int]] = (100, 100)):
+        super().__init__(pos)
+        self.land_max_capacity = 2
+        self.cost_currency = HAY
+        self.cost_amount = 4
+        self.abilities = [Ability(Action(self, DO_RECOLLECT_INHABITANTS, 1), 4, DOLLAR, ab_name="Recollect")]

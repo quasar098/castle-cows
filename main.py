@@ -317,14 +317,14 @@ def black_intro_screen():
 
 
 def relocate_mouse_events():
-    """move mouse button events to the front"""
+    """move mouse motion events to the back"""
     kl_list = []
     for event_move in events:
-        if event_move.type == pygame.MOUSEBUTTONDOWN:
+        if event_move.type == pygame.MOUSEMOTION:
             kl_list.append(event_move)
     for hit_target in kl_list:
         events.remove(hit_target)
-        events.insert(0, hit_target)
+        events.append(hit_target)
 
 
 running = True

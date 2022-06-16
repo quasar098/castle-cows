@@ -508,7 +508,8 @@ class Player:
                                     if isinstance(ability, list):
                                         for ab2 in ability:
                                             ab2.activate()
-                                    ability.activate()
+                                    else:
+                                        ability.activate()
                                 get_local_player().clear_queue()
                                 self.field.discard_card(card_field)
                             else:
@@ -1655,3 +1656,90 @@ class BlackMarket(Card):
         self.cost_currency = HAY
         self.cost_amount = 4
         self.abilities = [Ability(Action(self, DO_RECOLLECT_INHABITANTS, 1), 4, DOLLAR, ab_name="Recollect")]
+
+
+class InformationDealer(Card):
+    image = "information_dealer.png"
+    type = TYPE_ANIMAL
+
+    def __init__(self, pos: Union[list[int], tuple[int, int]] = (100, 100)):
+        super().__init__(pos)
+        self.cost_amount = 4
+        self.cost_currency = HAY
+        self.abilities = [Ability(Action(self, DO_SELF_DRAW_CARD, 1), 2, HAY, ab_name="Get a hint")]
+
+
+class UseArchLinux(Card):
+    image = "use_arch_linux.png"
+    type = TYPE_TALISMAN
+
+    def __init__(self, pos: Union[list[int], tuple[int, int]] = (100, 100)):
+        super().__init__(pos)
+        self.cost_amount = 0
+        self.cost_currency = HAY
+
+    def handle_action(self, action: int) -> Union[None, list[Action, DelayedAction, InputAction]]:
+        if action == GE_SELF_TURN_END:
+            return [Action(self, DO_SELF_GIVE_DOLLAR, PL_SELF_NUM_CARDS_PLAYED_THIS_TURN)]
+        return None
+
+
+class AdventCalendar(Card):
+    image = "advent_calendar.png"
+    type = TYPE_TALISMAN
+
+    def __init__(self, pos: Union[list[int], tuple[int, int]] = (100, 100)):
+        super().__init__(pos)
+        self.cost_amount = 4
+        self.cost_currency = DOLLAR
+        self.turns_had = 0  # apparently this is ok wow
+
+    def handle_action(self, action: int) -> Union[None, list[Action, DelayedAction, InputAction]]:
+        if action == GE_SELF_TURN_END:
+            self.turns_had += 1
+            return [Action(self, DO_SELF_GIVE_MILK, self.turns_had)]
+        return None
+
+
+class ThievingBull(Card):
+    image = "thieving_bull.png"
+    type = TYPE_ANIMAL
+
+    def __init__(self, pos: Union[list[int], tuple[int, int]] = (100, 100)):
+        super().__init__(pos)
+        self.cost_currency = DOLLAR
+        self.cost_amount = 1
+        self.abilities = []  # todo fix up input actions
+
+
+class RagingBull(Card):
+    image = "raging_bull"
+    type = TYPE_INCANTATION
+
+    def __init__(self, pos: Union[list[int], tuple[int, int]] = (100, 100)):
+        super().__init__(pos)
+        self.cost_amount = 2
+        self.cost_currency = HAY
+        self.abilities = []  # todo fix up input actions
+
+
+class InShiningArmor(Card):
+    image = "in_shining_armor.png"
+    type = TYPE_EQUIPMENT
+
+    def __init__(self, pos: Union[list[int], tuple[int, int]] = (100, 100)):
+        super().__init__(pos)
+        self.cost_amount = 2
+        self.cost_currency = DOLLAR
+        # todo make thieving bull
+
+
+class WatchOrbForHours(Card):
+    image = "watch_orb_for_hours.png"
+    type = TYPE_INCANTATION
+
+    def __init__(self, pos: Union[list[int], tuple[int, int]] = (100, 100)):
+        super().__init__(pos)
+        self.cost_amount = 5
+        self.cost_currency = DOLLAR
+        self.abilities = [Ability(Action(self, DO_SELF_DRAW_CARD, 3), 0, HAY), Ability(Action(self, DO_END_TURN, 1), 0, HAY)]

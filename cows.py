@@ -15,10 +15,10 @@ from random import choices as randchoice, random
 
 
 class Action:
-    def __init__(self, card, action: int, amount: Union[int, callable], conditional=None):
+    def __init__(self, card, action: int, param1: Union[int, callable], conditional=None):
         self.card: Card = card
         self.action = action
-        self.amount = amount
+        self.param1 = param1
         self.conditional: Union[ActionConditional, None] = conditional
 
 
@@ -629,12 +629,12 @@ class Player:
         # overcrowding on lands:
         for card in [_ for _ in self.field.cards if _.type == TYPE_LAND and _.was_on_field]:
             if card.land_max_capacity is not None:
-                if card.land_max_capacity == 0:
-                    camera_to_card(card)
-                    add_popup("This land can't have any animals!")
-                    return True
                 if len([res for res in card.get_residents() if res.card_is_cow or not card.land_only_holds_cows]) > card.land_max_capacity:
                     camera_to_card(card)
+                    if card.land_max_capacity == 0:
+                        camera_to_card(card)
+                        add_popup("This land can't have any animals!")
+                        return True
                     add_popup("Too many animals on this land!")
                     return True
 
@@ -936,7 +936,7 @@ def execute_action(action: Union[Action, DelayedAction, InputAction]) -> None:
             return
     if isinstance(action, Action):
         # substitute the real amount in for a placeholder (e.g. NUM_COWS -> [actual number of cows])
-        amount = replace_placeholder(action.amount)
+        amount = replace_placeholder(action.param1)
 
         # particle position
         particle_pos = _move_pos(action.card.mod_pos(), (125, 162))
@@ -950,11 +950,11 @@ def execute_action(action: Union[Action, DelayedAction, InputAction]) -> None:
                 if isinstance(action.card, mul_class):
                     multiplier *= _s[mul_class]
         if action.action == DO_RUN_FUNCTION:
-            action.amount()
+            action.param1()
             return
         for _ in range(amount*multiplier):
             if action.action == DO_SELF_DRAW_CARD:
-                get_local_player().draw_card(action.amount)
+                get_local_player().draw_card(action.param1)
                 return
             if action.action == DO_RECOLLECT_INHABITANTS:
                 res = get_local_player().get_cards_recursively(action.card.get_residents())
@@ -979,12 +979,12 @@ def execute_action(action: Union[Action, DelayedAction, InputAction]) -> None:
                 get_local_player().hay += 1
                 currency_particles.append(CurrencyParticle(particle_pos, HAY))
             if action.action == DO_STEAL_DOLLAR_FROM_ALL_OPPONENTS:
-                get_local_player().dollar += get_statistics_manager().get_num_players() * action.amount
+                get_local_player().dollar += get_statistics_manager().get_num_players() * action.param1
                 # todo: remove money from other players
             if action.action == DO_SELF_DRAW_DAIRY_COW:
-                get_local_player().draw_card(action.amount, DairyCow)
+                get_local_player().draw_card(action.param1, DairyCow)
             if action.action == DO_SELF_DRAW_MANURE:
-                get_local_player().draw_card(action.amount, Manure)
+                get_local_player().draw_card(action.param1, Manure)
             if action.action == DO_TAKE_TOP_DISCARD_CARD:
                 if len(get_local_player().discard_pile) >= 1:
                     revived = get_local_player().discard_pile[len(get_local_player().discard_pile)-1]
@@ -993,7 +993,7 @@ def execute_action(action: Union[Action, DelayedAction, InputAction]) -> None:
                     get_local_player().hand.cards.append(revived)
                     get_local_player().discard_pile.pop(len(get_local_player().discard_pile)-1)
         if action.action == DO_TAKE_ALL_DISCARD_CARDS:
-            outcome = random() < action.amount/100
+            outcome = random() < action.param1 / 100
             if outcome:
                 for card in get_local_player().discard_pile:
                     card.was_on_field = False
@@ -1371,7 +1371,8 @@ class GoldenCow(Card):
         self.cost_amount = 5
         self.card_is_cow = True
         self.cost_currency = HAY
-        self.abilities = [[Ability(Action(self, DO_DISCARD_THIS_CARD, 0), 0, HAY, "Cash out"), Ability(Action(self, DO_SELF_GIVE_DOLLAR, 4), 0)]]
+        self.abilities = [[Ability(Action(self, DO_DISCARD_THIS_CARD, 0), 0, HAY, "Cash out"), Ability(
+            Action(self, DO_SELF_GIVE_DOLLAR, 4), 0)]]
         # executes two actions, but acts as one ability.
 
     def handle_action(self, action: int) -> Union[None, list[Action, DelayedAction, InputAction]]:
@@ -1583,12 +1584,7 @@ class CustomInstallation(Card):
         self.cost_amount = 0
         self.cost_currency = HAY
         self.abilities = [Ability(
-            Action(
-                self,
-                DO_SELF_DRAW_CARD,
-                1,
-                ActionConditional(self, REQ_LAND_AMOUNT, COND_OPERATOR_LESS_THAN, 3)
-                   ),
+            Action(self, DO_SELF_DRAW_CARD, 1, ActionConditional(self, REQ_LAND_AMOUNT, COND_OPERATOR_LESS_THAN, 3)),
             5,
             DOLLAR,
             ab_name="DLL replacement"

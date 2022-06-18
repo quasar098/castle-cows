@@ -215,7 +215,7 @@ def draw_game():
     if not get_local_player().doing_input_action:
         screen.blit(
             fetch_text(
-                f"{get_statistics_manager().turns_passed} turn{'s'*(get_statistics_manager().turns_passed != 1)} passed", font),
+                f"turn {get_statistics_manager().turns_passed}", font),
             (10, 10)
         )
 

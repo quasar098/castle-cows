@@ -601,6 +601,7 @@ class Player:
         get_local_player().update_visible_currencies()
         # draw step stuff
         if self.step == "use":
+            get_statistics_manager().turns_passed += 1
             self.draw_card()
         # collect step stuff
         if self.step == "collect":
@@ -1882,3 +1883,22 @@ class UnionWorkerCow(Card):
 
     def unionize(self):
         execute_action(Action(self, DO_SELF_GIVE_DOLLAR, get_local_player().amount_of(UnionWorkerCow)))
+
+
+class GroceryStore(Card):
+    image = "grocery_store.png"
+    type = TYPE_LAND
+
+    def __init__(self, pos: Union[list[int], tuple[int, int]] = (100, 100)):
+        super().__init__(pos)
+        self.land_max_capacity = 0
+        self.cost_amount = 2
+        self.cost_currency = HAY
+        self.abilities = [Ability(Action(self, DO_RUN_FUNCTION, self.milkify), 0, HAY, ab_name="Milk monopoly"),
+                          Ability(Action(self, DO_SELF_GIVE_MILK, 3), 1, DOLLAR, ab_name="Dad bought milk")]
+
+    def milkify(self):
+        while get_local_player().milk >= 10:
+            execute_action(Action(self, DO_SELF_GIVE_DOLLAR, 2))
+            get_local_player().milk -= 10
+        get_local_player().visible_milk = get_local_player().milk

@@ -23,18 +23,18 @@ class Action:
 
 
 class InputAction:
-    def __init__(self, card, what_choose: int, amount: int, conditional=None):
+    def __init__(self, card, what_choose: int, param1: int, conditional=None):  # todo this is pretty much abandonied fix it sometime pls
         self.card: Card = card
         self.choose = what_choose
-        self.amount = amount
+        self.param1 = param1
         self.conditional: Union[ActionConditional, None] = conditional
 
 
 class DelayedAction:
-    def __init__(self, card, action: int, amount: int, wait_for: int, conditional=None):
+    def __init__(self, card, action: int, param1: int, wait_for: int, conditional=None):
         self.card: Card = card
         self.action = action
-        self.amount = amount
+        self.param1 = param1
         self.wait_for = wait_for
         self.conditional: Union[ActionConditional, None] = conditional
 
@@ -725,7 +725,7 @@ class Player:
         delayed_action_kill_list = []
         for delayed_action in self.delayed_action_queue:
             if delayed_action.wait_for == action:
-                execute_action(Action(delayed_action.card, delayed_action.action, delayed_action.amount))
+                execute_action(Action(delayed_action.card, delayed_action.action, delayed_action.param1))
                 delayed_action_kill_list.append(delayed_action)
         for kill_me in delayed_action_kill_list:
             self.delayed_action_queue.remove(kill_me)
@@ -1060,6 +1060,7 @@ class Card:
         # other
         self.card_is_cow = False
         self.card_buff_equipment_multipliers = {}  # same as land multipliers but buffs the equipment
+        self.card_buff_neighbors = {}  # buffs the other inhabitants of a land
         # todo add this
 
         # inhabitant
@@ -1898,3 +1899,29 @@ class GroceryStore(Card):
             execute_action(Action(self, DO_SELF_GIVE_DOLLAR, 2))
             get_local_player().milk -= 10
         get_local_player().visible_milk = get_local_player().milk
+
+
+class BaronCow(Card):
+    image = "baron_cow.png"
+    type = TYPE_ANIMAL
+
+    def __init__(self, pos: Union[list[int], tuple[int, int]] = (100, 100)):
+        super().__init__(pos)
+        self.cost_amount = 2
+        self.cost_currency = HAY
+        self.card_buff_equipment_multipliers = {Card: 2}
+
+
+class AnalogClock(Card):
+    image = "analog_clock.png"
+    type = TYPE_EQUIPMENT
+
+    def __init__(self, pos: Union[list[int], tuple[int, int]] = (100, 100)):
+        super().__init__(pos)
+        self.cost_amount = 8
+        self.cost_currency = MILK
+
+    def handle_action(self, action: int) -> Union[None, list[Action, DelayedAction, InputAction]]:
+        if action == GE_SELF_TURN_START:
+            return [Action(self, DO_SELF_GIVE_DOLLAR, get_parent(self).cost_amount)]
+        return None

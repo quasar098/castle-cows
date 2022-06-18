@@ -244,11 +244,21 @@ class Player:
         self.visible_hay = self.hay
         currency_particles = []
 
+    def all_of_type(self, card_class):
+        return [card for card in self.get_cards_recursively() if isinstance(card, card_class)]
+
+    def amount_of(self, card_class):
+        return len(self.all_of_type(card_class))
+
     @property
     def currencies(self):
         return {DOLLAR: self.dollar, HAY: self.hay, MILK: self.milk}
 
-    def draw(self, surface: pygame.Surface, font: pygame.font.Font):
+    @property
+    def can_use_cards(self):
+        return self.step == "use"
+
+    def draw(self, surface: pygame.Surface, font: pygame.font.Font, big_font: pygame.font.Font):
         # ratios and div numbers
         box_width = 40
         box_height = 90
@@ -256,8 +266,11 @@ class Player:
         spacing_x = 18
         box_height_from_top = 7
 
-        # used a lot
+        # this is used a lot
         player_info_rect = pygame.Rect((10, pygame.display.get_surface().get_height()-160+box_height_from_top, 150, 150))
+
+        # show step
+        surface.blit(fetch_text(f"step: {self.step}", big_font), (10, 40))
 
         # money border
         money_rectangle = pygame.Rect(player_info_rect.left, player_info_rect.top, box_width, box_height)
@@ -564,6 +577,8 @@ class Player:
                                 # do the deed
                                 self.field.cards.remove(card_find)
                                 card.equipped.append(card_find)
+                                for action in card_find.handle_action(GE_THIS_CARD_EQUIPPED):
+                                    execute_action(action)
                                 return True
             # could not find a card to go on top of
             if self.field.cards.__contains__(card_find):  # assert is not null (same as above)
@@ -574,23 +589,24 @@ class Player:
             return False
 
     def next_turn_step(self):
-
-        # note that this segment makes it so that waiting for someone else's happens if not in sandbox
-        if self.step == "use":
-            get_statistics_manager().turns_passed += 1
-        if self.step == "use" and not self.in_sandbox:
-            self.is_my_turn = False
-            self.step = "collect"
+        # wait for other turn
         if not self.is_my_turn:
+            add_popup("Not your turn!")
             return True
+        # valid cards check
         if self.do_validity_check():
             return True
-        steps = ["collect", "draw", "use"]
-        self.step = steps[divmod(steps.index(self.step)+1, len(steps))[1]]
-        if self.step == "draw":
+        # change step
+        self.step = "collect" if self.step == "use" else "use"
+        get_local_player().update_visible_currencies()
+        # draw step stuff
+        if self.step == "use":
             self.draw_card()
-            # line below skip draw step
-            self.step = steps[divmod(steps.index(self.step)+1, len(steps))[1]]
+        # collect step stuff
+        if self.step == "collect":
+            self.hay = 0
+            self.handle_card_actions(GE_SELF_TURN_START)
+            self.reset_abilities()
         return False
 
     def do_validity_check(self) -> bool:
@@ -932,12 +948,24 @@ def execute_action(action: Union[Action, DelayedAction, InputAction]) -> None:
             for mul_class in _s:
                 if isinstance(action.card, mul_class):
                     multiplier *= _s[mul_class]
+        if action.action == DO_RUN_FUNCTION:
+            action.amount()
+            return
         for _ in range(amount*multiplier):
             if action.action == DO_SELF_DRAW_CARD:
                 get_local_player().draw_card(action.amount)
+                return
             if action.action == DO_RECOLLECT_INHABITANTS:
-                for card in get_local_player().get_cards_recursively(action.card.get_residents()):
-                    card.handle_action(GE_SELF_TURN_START)
+                res = get_local_player().get_cards_recursively(action.card.get_residents())
+                max_cupoc = action.card.land_max_capacity
+                assert action.card.land_max_capacity is not None
+                for count, card in enumerate(res):
+                    if count+1 > max_cupoc:  # so the player cannot drag all cows onto black market and go crazy
+                        return
+                    actions = card.handle_action(GE_SELF_TURN_START)
+                    for action in actions:
+                        execute_action(action)
+                return
             if action.action == DO_SELF_DUPLICATE_CARD:
                 get_local_player().hand.cards.append(type(get_parent(action.card))())
             if action.action == DO_SELF_GIVE_DOLLAR:
@@ -1713,7 +1741,7 @@ class ThievingBull(Card):
 
 
 class RagingBull(Card):
-    image = "raging_bull"
+    image = "raging_bull.png"
     type = TYPE_INCANTATION
 
     def __init__(self, pos: Union[list[int], tuple[int, int]] = (100, 100)):
@@ -1743,3 +1771,114 @@ class WatchOrbForHours(Card):
         self.cost_amount = 5
         self.cost_currency = DOLLAR
         self.abilities = [Ability(Action(self, DO_SELF_DRAW_CARD, 3), 0, HAY), Ability(Action(self, DO_END_TURN, 1), 0, HAY)]
+
+
+class ScientistCow(Card):
+    image = "scientist_cow.png"
+    type = TYPE_ANIMAL
+
+    def __init__(self, pos: Union[list[int], tuple[int, int]] = (100, 100)):
+        super().__init__(pos)
+        self.cost_amount = 2
+        self.cost_currency = HAY
+
+    def handle_action(self, action: int) -> Union[None, list[Action, DelayedAction, InputAction]]:
+        if action == GE_SELF_TURN_START:
+            return [Action(self, DO_SELF_GIVE_DOLLAR, 2)]
+        if action == GE_SELF_PLAY_CARD:
+            if any([typa for typa in get_local_player().get_cards_recursively() if isinstance(typa, ScientificResearchBook)]):
+                return [Action(self, DO_SELF_GIVE_DOLLAR, 1)]
+        return None
+
+
+class Wormhole(Card):
+    image = "wormhole.png"
+    type = TYPE_INCANTATION
+
+    def __init__(self, pos: Union[list[int], tuple[int, int]] = (100, 100)):
+        super().__init__(pos)
+        self.cost_amount = 1
+        self.cost_currency = HAY
+
+
+class SecretaryCow(Card):
+    image = "secretary_cow.png"
+    type = TYPE_ANIMAL
+
+    def __init__(self, pos: Union[list[int], tuple[int, int]] = (100, 100)):
+        super().__init__(pos)
+        self.cost_amount = 6
+        self.cost_currency = HAY
+
+    def handle_action(self, action: int) -> Union[None, list[Action, DelayedAction, InputAction]]:
+        if action == GE_SELF_TURN_START:
+            return [Action(self, DO_SELF_DRAW_CARD, 1)]
+        return None
+
+
+class GoodManagement(Card):
+    image = "good_management.png"
+    type = TYPE_EQUIPMENT
+
+    def __init__(self, pos: Union[list[int], tuple[int, int]] = (100, 100)):
+        super().__init__(pos)
+        self.cost_amount = 5
+        self.cost_currency = MILK
+
+    def handle_action(self, action: int) -> Union[None, list[Action, DelayedAction, InputAction]]:
+        if action == GE_SELF_TURN_START:
+            return [Action(self, DO_SELF_GIVE_DOLLAR, 1)]
+        return None
+
+
+class UpperManagement(Card):
+    image = "upper_management.png"
+    type = TYPE_EQUIPMENT
+
+    def __init__(self, pos: Union[list[int], tuple[int, int]] = (100, 100)):
+        super().__init__(pos)
+        self.cost_amount = 2
+        self.cost_currency = HAY
+
+    def handle_action(self, action: int) -> Union[None, list[Action, DelayedAction, InputAction]]:
+        if action == GE_THIS_CARD_EQUIPPED:
+            par = get_parent(self)
+            if par is not None:
+                if par.cost_currency == HAY:
+                    return [Action(self, DO_SELF_GIVE_HAY, par.cost_amount)]
+                if par.cost_currency == DOLLAR:
+                    return [Action(self, DO_SELF_GIVE_DOLLAR, par.cost_amount)]
+                if par.cost_currency == MILK:
+                    return [Action(self, DO_SELF_GIVE_MILK, par.cost_amount)]
+        return None
+
+
+class WheatField(Card):
+    image = "wheat_field.png"
+    type = TYPE_LAND
+
+    def __init__(self, pos: Union[list[int], tuple[int, int]] = (100, 100)):
+        super().__init__(pos)
+        self.cost_amount = 4
+        self.cost_currency = DOLLAR
+        self.land_max_capacity = 2
+        self.land_buff_animal_multipliers = {DairyCow: 2}
+
+    def handle_action(self, action: int) -> Union[None, list[Action, DelayedAction, InputAction]]:
+        if action == GE_SELF_TURN_START:
+            return [Action(self, DO_SELF_GIVE_HAY, 2)]
+        return None
+
+
+class UnionWorkerCow(Card):
+    image = "union_worker_cow.png"
+    type = TYPE_ANIMAL
+
+    def __init__(self, pos: Union[list[int], tuple[int, int]] = (100, 100)):
+        super().__init__(pos)
+        self.cost_amount = 2
+        self.cost_currency = HAY
+        self.abilities = [Ability(Action(self, DO_RUN_FUNCTION, self.unionize), 0, HAY, ab_name="Strike benefits")]
+
+    def unionize(self):
+        execute_action(Action(self, DO_SELF_GIVE_DOLLAR, get_local_player().amount_of(UnionWorkerCow)))

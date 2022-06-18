@@ -79,23 +79,9 @@ def window_buttons(back=True):
 
 
 def next_step():
-    play_sound(default_sound, 0.4)
-    if not get_local_player().is_my_turn:
-        add_debug_popup("not ur turn bro", small_font)
-        return
+    play_sound(default_sound, 0.5)
     if get_local_player().next_turn_step():
         return
-    get_local_player().update_visible_currencies()
-    step_texts = {"collect": "draw a card", "draw": "use your cards", "use": "end your turn"}  # what the button will say
-    next_step_button.change(text=step_texts[get_local_player().step], color=(0, 0, 0))
-    if get_local_player().step == "collect":  # new turn
-        get_local_player().hay = 0
-        get_local_player().visible_hay = 0
-        get_local_player().handle_card_actions(GE_SELF_TURN_START)
-        get_local_player().reset_abilities()
-        turn_count_text.change(font, f"{get_statistics_manager().turns_passed} turn{(get_statistics_manager().turns_passed>1)*'s'} passed")
-    if get_local_player().step == "draw":
-        play_sound(fold_sound, 0.5)
 
 
 # important ui
@@ -104,10 +90,8 @@ exit_button = Button((WIDTH-40, 10, 30, 30), font, action=exit_cows, text="x")
 minimize_button = Button((WIDTH-80, 10, 30, 30), font, action=minimize_cows, text="-")
 
 # game ui
-next_step_button = Button((10, HEIGHT-47, 156, 30), small_font, action=next_step, text="draw a card")
+next_step_button = Button((10, HEIGHT-47, 156, 30), small_font, action=next_step, text="next step")
 pause_menu = PauseMenu()
-turn_count_text = Text((10, 10, 300, 60), font, "first turn", "topleft")
-
 
 # main menu ui
 server_input_box = InputBox(pygame.Rect(WIDTH/2-100, HEIGHT/2+50, 200, 40), font, text_if_no_text="enter ip here")
@@ -117,10 +101,10 @@ deck_build_button = Button((WIDTH/2-100, HEIGHT/2+310, 200, 80), font, set_scree
 logo_image = get_image(join("images", "logo.png"))
 
 # debug ui thingies
-fps_text = Text((10, 10), font, "fps: 0", alignment="topleft")
 mouse_pos_text = Text((10, 70), font, "mouse pos: (0, 0)", alignment="topleft")
 cashes_text = Text((10, 100), font, "None", alignment="topleft")
 camera_pos_text = Text((10, 130), font, "camera pos here", alignment="topleft")
+fps_text = Text((10, 160), font, "fps: 0", alignment="topleft")
 
 
 # sounds
@@ -223,13 +207,17 @@ def draw_game():
 
     # bottom bar draw
     my_turn = get_local_player().is_my_turn
-    get_local_player().draw(screen, small_font)
+    get_local_player().draw(screen, small_font, big_font=font)
     next_step_button.color = pygame.Color(190+int(my_turn)*65, 190+int(my_turn)*65, 190+int(my_turn)*65)
     next_step_button.draw(screen)
 
     # important ui buttons
     if not get_local_player().doing_input_action:
-        turn_count_text.draw(screen)
+        screen.blit(
+            fetch_text(
+                f"{get_statistics_manager().turns_passed} turn{'s'*(get_statistics_manager().turns_passed != 1)} passed", font),
+            (10, 10)
+        )
 
     # currency particles
     remove_currency_particles = []

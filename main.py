@@ -194,7 +194,7 @@ def draw_game():
                 break
         else:
             next_step_button.pressed = False
-        if get_local_player().handle_events(ev, rel):
+        if get_local_player().handle_events(ev):
             break
 
         # popup handling

@@ -161,10 +161,10 @@ class Field:
         for card in self.cards:
             card.draw(surface)
 
-    def handle_events(self, event: pygame.event.Event, rel: tuple[int, int]):
+    def handle_events(self, event: pygame.event.Event):
         for card in self.cards.__reversed__():
             sel_prev = card.selected
-            mouseevent = card.handle_events(event, rel)
+            mouseevent = card.handle_events(event)
             if mouseevent == pygame.MOUSEBUTTONDOWN:
                 if event.button == 1:
                     self.put_on_top(card)
@@ -437,7 +437,7 @@ class Player:
         else:
             pygame.mouse.set_cursor(pygame.cursors.Cursor(pygame.SYSTEM_CURSOR_ARROW))
 
-    def handle_events(self, event: pygame.event.Event, rel: tuple[int, int]):
+    def handle_events(self, event: pygame.event.Event):
         # prevent doing anything if getting input action
         if self.doing_input_action:
             if event.type == pygame.MOUSEBUTTONDOWN:
@@ -489,13 +489,14 @@ class Player:
                     if card_index_find == card:
                         self.index_of_grab = index_count
                 self.hand.cards.remove(card)
-                card.x, card.y = _move_pos(mod_pos(pygame.mouse.get_pos()[0], pygame.mouse.get_pos()[1], True), (-125, -162))
+                card.x, card.y = pygame.mouse.get_pos()
+                card.grab_off = (-125, -162)
                 card.selected = True
                 self.field.cards.append(card)
                 return True
 
         # grabbing and letting go of card in field
-        card_field = self.field.handle_events(event, rel)
+        card_field = self.field.handle_events(event)
         if self.field.cards.__contains__(card_field):
             if isinstance(card_field, Card):
                 # let go of card
@@ -1047,6 +1048,7 @@ class Card:
         self.selected = False
         self.abilities: list[Union[Ability, list[Ability]]] = []  # can be [Ability()] or [Ability(), [Ability(), Ability()]] etc
         self.was_on_field = False
+        self.grab_off = (0, 0)
         self.equipped: list[Card] = []
 
         # cost stuff
@@ -1170,7 +1172,7 @@ class Card:
         to determine if the card is eligible to perform a special thing on that action or not"""
         pass
 
-    def handle_events(self, event: pygame.event.Event, rel: tuple[int, int], rect_h=None) -> int:
+    def handle_events(self, event: pygame.event.Event, rect_h=None) -> int:
         global debug
 
         rect_of_self = self.get_rect()
@@ -1182,6 +1184,8 @@ class Card:
             if event.button == 1:
                 if rect_of_self.collidepoint(pygame.mouse.get_pos()):
                     self.selected = True
+                    mp = mod_pos(*pygame.mouse.get_pos(), inv=True)
+                    self.grab_off = self.x-mp[0], self.y-mp[1]
                     return pygame.MOUSEBUTTONDOWN
         if event.type == pygame.MOUSEBUTTONUP:
             if event.button == 1:
@@ -1191,8 +1195,9 @@ class Card:
             self.selected = False
         if event.type == pygame.MOUSEMOTION:
             if self.selected:
-                self.x += rel[0]
-                self.y += rel[1]
+                mp = pygame.mouse.get_pos()
+                mp = mod_pos(mp[0], mp[1], inv=True)
+                self.x, self.y = mp[0]+self.grab_off[0], mp[1]+self.grab_off[1]
         return False
 
     def __str__(self):
